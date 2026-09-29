@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TS POSM KPI Grading</title>
+<style>
+:root{
+  --bg:#06141b; --bg2:#0a1f29; --card:#0e2733; --card2:#123241; --line:#1d4556;
+  --text:#e6f4f7; --muted:#8fb3bf; --accent:#19d3c5; --accent2:#3fa9f5;
+  --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",Roboto,Arial,sans-serif}
+body{background:radial-gradient(1200px 600px at 80% -10%,#0f3a48 0%,transparent 60%),var(--bg);min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:10;background:rgba(6,20,27,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.hwrap{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-weight:800;color:#04202a;box-shadow:0 0 18px rgba(25,211,197,.45);font-size:12px}
+.brand h1{font-size:16px;margin:0;letter-spacing:.3px}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.controls label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+input,select,textarea{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(25,211,197,.15)}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+nav{max-width:1280px;margin:0 auto;padding:0 16px;display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:none;padding:10px 13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:600}
+nav button.active{color:var(--accent);border-color:var(--accent)}
+main{max-width:1280px;margin:0 auto;padding:18px 16px 60px}
+.grid{display:grid;gap:14px}
+.cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.enc{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+@media(max-width:900px){.two,.enc,.three{grid-template-columns:minmax(0,1fr)}}
+.mt{margin-top:14px}
+.card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.card h3{margin:0 0 12px;font-size:12.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);font-weight:700}
+.stat .v{font-size:28px;font-weight:800}
+.stat .s{color:var(--muted);font-size:12px}
+.btn{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.pri{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04202a;border:none}
+.btn.danger{color:#fca5a5;border-color:#5b2626}
+.btn.ok{color:#86efac;border-color:#1f5b36}
+.btn.sm{padding:5px 10px;font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:700}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:hover td{background:rgba(25,211,197,.04)}
+.chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;color:#04202a;white-space:nowrap}
+.tag{display:inline-block;padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.ack{color:#86efac;border-color:#1f5b36}.tag.dis{color:#fca5a5;border-color:#7f1d1d}.tag.pen{color:#fcd34d;border-color:#6b4f12}
+.muted{color:var(--muted)}
+.bar{height:10px;background:var(--bg2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px}
+.kpibar{display:grid;grid-template-columns:minmax(110px,1.3fr) 3fr 64px;gap:10px;align-items:center;margin:8px 0}
+.kpibar .n small{color:var(--muted)}
+.kpibar .p{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.funnel .step{display:grid;grid-template-columns:140px 1fr 64px;gap:10px;align-items:center;margin:7px 0}
+.funnel .fb{height:26px;border-radius:6px;background:linear-gradient(90deg,#19d3c5,#3fa9f5);display:flex;align-items:center;padding-left:8px;font-weight:700;color:#04202a;font-size:12px;min-width:2px}
+@media(max-width:560px){.funnel .step{grid-template-columns:96px 1fr 56px}.kpibar{grid-template-columns:1fr 64px}.kpibar .bar{grid-column:1/-1;order:3}}
+.sect{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--bg2)}
+.sect .hd{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:4px}
+.sect .hd b{font-size:14px}
+.sect .hd span{font-size:12px;color:var(--accent);font-weight:700;white-space:nowrap}
+.sect p{margin:0 0 10px;color:var(--muted);font-size:12px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.fields label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.fields input{width:100%}
+.butbl input{width:100%;min-width:64px;padding:6px 8px;text-align:right}
+.butbl td,.butbl th{padding:5px 4px;border:none}
+input.auto{border-color:#3fa9f5;background:#0b2a3c}
+.res{margin-top:10px;font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.res b{color:var(--text)}
+.err{color:#fca5a5;font-size:12px;margin-top:6px}
+.calc{font-variant-numeric:tabular-nums}
+.calc .ln{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;gap:8px}
+.calc .ln span:first-child{color:var(--muted)}
+.final{text-align:center;padding:14px 0 6px}
+.final .v{font-size:44px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.flag{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#fcd34d;padding:7px 10px;border-radius:8px;font-size:12px;margin-top:6px}
+.flag.red{color:#fca5a5;border-color:#7f1d1d;background:rgba(239,68,68,.1)}
+.flag.green{color:#86efac;border-color:#1f5b36;background:rgba(34,197,94,.08)}
+.flag.blue{color:#bae6fd;border-color:#1e4f6e;background:rgba(63,169,245,.08)}
+.sticky{position:sticky;top:120px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--accent);padding:10px 18px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;z-index:60;max-width:90vw}
+.toast.show{opacity:1}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.hidden{display:none!important}
+svg text{fill:var(--muted);font-size:13px}
+.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:end}
+.pod{border-radius:12px;padding:12px 10px;text-align:center;border:1px solid var(--line);background:var(--bg2)}
+.pod .rk{font-size:11px;font-weight:800;letter-spacing:1px;padding:3px 10px;border-radius:99px;display:inline-block;color:#1a1a1a}
+.pod .nm{font-weight:700;margin-top:8px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod .sc{font-size:22px;font-weight:800;margin-top:2px}
+.pod.p1{padding-top:26px;border-color:#b8962e;box-shadow:0 0 20px rgba(234,179,8,.15)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:50;padding:16px}
+.modal .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(380px,100%)}
+.sync{font-size:11px;padding:4px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.sync.on{color:#86efac;border-color:#1f5b36}.sync.err{color:#fca5a5;border-color:#7f1d1d}
+.insight{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.insight i{font-style:normal;flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;color:#04202a}
+code{background:var(--bg2);padding:1px 5px;border-radius:4px;font-size:12px}
+ol.steps{padding-left:18px;margin:6px 0;font-size:12.5px;color:var(--muted)}
+ol.steps li{margin:4px 0}
+@media print{
+  header,nav,.noprint{display:none!important}
+  body{background:#fff;color:#000}
+  .card{background:#fff;border:1px solid #ccc;color:#000;break-inside:avoid}
+  .muted,th,.card h3{color:#444}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hwrap">
+    <div class="brand">
+      <div class="logo">KPI</div>
+      <div><h1>TS POSM KPI Grading</h1><small>RMAS VISTA · Monthly Scorecard</small></div>
+    </div>
+    <div class="controls">
+      <label for="gMonth">Month</label>
+      <input type="month" id="gMonth">
+      <label for="gRegion">Region</label>
+      <select id="gRegion"></select>
+      <span class="sync" id="syncStat">Offline</span>
+      <button class="btn sm" id="roleBtn"></button>
+    </div>
+  </div>
+  <nav id="nav">
+    <button data-v="dash" class="active">Dashboard</button>
+    <button data-v="enc" data-admin="1">Encode Grades</button>
+    <button data-v="card">TS Scorecard</button>
+    <button data-v="roll">Quarterly / Yearly</button>
+    <button data-v="imp" data-admin="1">Import &amp; Sync</button>
+    <button data-v="set" data-admin="1">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <section id="v-dash"></section>
+  <section id="v-enc" class="hidden"></section>
+  <section id="v-card" class="hidden"></section>
+  <section id="v-roll" class="hidden"></section>
+  <section id="v-imp" class="hidden"></section>
+  <section id="v-set" class="hidden"></section>
+</main>
+<div class="toast" id="toast"></div>
+<div id="modalHost"></div>
+
+<script>
+/* =====================================================================
+   ONLINE CONFIG — fill these in ONCE before uploading to GitHub Pages.
+   With KPI_SHEET_URL set, every device that opens the page syncs
+   automatically (no need to paste the URL on each phone/laptop).
+   ===================================================================== */
+const CONFIG={
+  KPI_SHEET_URL:'https://script.google.com/macros/s/AKfycbygdnoRRsnSS20w047MS2lNOjY9pqxCNb-ehatEEdriwgUdzlw_vXz5vDixwDCqupTc/exec',     // Web App URL of THIS tool's Google Sheet (Code.gs) — ends in /exec
+  INVENTORY_URL:'https://script.google.com/macros/s/AKfycbxJ7UqqR7WKe9iBu1y9QUm4UdFsZT-oNLnRdwNsG1M2i3DrjvW0YnXY1QHb4H22SQse/exec',     // RMAS Inventory Tool
+  DEPLOYMENT_URL:'https://script.google.com/macros/s/AKfycbyqiLr5I2Cy0dQRdNxZenefc06ITJ4tduwpc6QB2mRglUbUMJvqElesO58W6kA9b3dXCQ/exec'     // POSM KPI Command Center / Deployment KPI Tool
+};
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+const STORE_KEY='rmas_ts_posm_kpi_v4', OLD_KEY='rmas_ts_posm_kpi_v3', ROLE_KEY='rmas_kpi_role', URL_KEY='rmas_kpi_sheet_url';
+const BUS=['AV','HA','AC'];
+const BU_FIELDS=[['required','Target deployments'],['complete','Complete'],['fullDep','Incomplete – Full Dep. (no stock)'],['delivered','Request POSM delivered (qty)']];
+const BU_SHORT={required:'Target',complete:'Complete',fullDep:'Inc. Full Dep.',delivered:'Request delivered qty'};
+const DEFAULT_WEIGHTS={dep:40,rep:40,com:20};
+const DEFAULT_GRADES=[
+  {min:95,label:'Outstanding',color:'#19d3c5'},{min:90,label:'Excellent',color:'#3fa9f5'},
+  {min:85,label:'Very Good',color:'#7dd3fc'},{min:80,label:'Good',color:'#a3e635'},
+  {min:75,label:'Needs Improvement',color:'#f59e0b'},{min:0,label:'Poor',color:'#ef4444'}];
+const DEFAULT_DEDUCTIONS=[
+  {id:'d1',label:'Fake / recycled photo proof',pts:5},
+  {id:'d2',label:'Unreported damaged / outdated POSM found in audit',pts:3},
+  {id:'d3',label:'POSM deployed not per allocation (wrong store/model)',pts:3},
+  {id:'d4',label:'No-show on RMAS-scheduled store visit without notice',pts:2}];
+const FLAT={
+  req:[['reqDeployed','Delivered request POSM actually deployed (qty) — only if partially deployed']],
+  audit:[['auditStores','Stores audited (random audit)'],['auditVerified','Stores with verified actual display']],
+  rep:[['repDue','Reports due this month'],['repOnTime','Submitted on time'],['repAccurate','Accurate (no corrections needed)'],['reported','Deployments reported with photo proof']],
+  com:[['comSent','RMAS instructions / concerns sent'],['comResp','Acknowledged / responded within SLA'],['meetReq','Meetings / huddles required'],['meetAtt','Meetings / huddles attended']]
+};
+const FLAT_KEYS=Object.values(FLAT).flat().map(f=>f[0]);
+const BU_PATHS=BUS.flatMap(b=>BU_FIELDS.map(([f])=>`bu.${b}.${f}`));
+const ALL_PATHS=[...BU_PATHS,...FLAT_KEYS];
+const FIELD_LABEL=Object.fromEntries([...BU_FIELDS,...Object.values(FLAT).flat()]);
+
+/* =====================================================================
+   UTILS
+   ===================================================================== */
+const n=v=>{const x=parseFloat(v);return isFinite(x)&&x>=0?x:0};
+const has=v=>v!==undefined&&v!==null&&v!=='';
+const clamp=x=>Math.max(0,Math.min(1,x));
+const avg=a=>a.length?a.reduce((p,q)=>p+q,0)/a.length:null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=(x,d=1)=>x==null?'—':(x*100).toFixed(d)+'%';
+const fx=(x,d=2)=>x==null?'—':x.toFixed(d)+'%';
+function getP(o,p){return p.split('.').reduce((x,k)=>x==null?undefined:x[k],o)}
+function setP(o,p,v){const ks=p.split('.');let x=o;ks.slice(0,-1).forEach(k=>{if(!x[k]||typeof x[k]!=='object')x[k]={};x=x[k]});x[ks[ks.length-1]]=v}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
+function monthLabel(m){const [y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleString('en',{month:'long',year:'numeric'})}
+function monthShort(m){const [y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleString('en',{month:'short'})+' '+y.slice(2)}
+function addMonths(m,k){const [y,mo]=m.split('-').map(Number);const d=new Date(y,mo-1+k,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function thisMonth(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function download(name,text,type){const b=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function toCsv(lines){return lines.map(l=>l.map(csvCell).join(',')).join('\n')}
+function parseCsv(text){text=text.replace(/^﻿/,'');const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i];
+  if(q){if(c==='"'&&text[i+1]==='"'){cell+='"';i++}else if(c==='"')q=false;else cell+=c}
+  else if(c==='"')q=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}else cell+=c}
+  if(cell||row.length){row.push(cell);rows.push(row)}return rows.filter(r=>r.some(x=>String(x).trim()))}
+function copyFallback(t){const ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove()}
+function copyText(t){if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t).catch(()=>copyFallback(t));copyFallback(t);return Promise.resolve()}
+function uid(p='ts'){return p+Math.random().toString(36).slice(2,9)}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+
+/* =====================================================================
+   KPI DEFINITIONS
+   ===================================================================== */
+// deployed = "done" = Complete + Incomplete-Full-Deployment (no stock available → counted as complete)
+function agg(r){const o={required:0,complete:0,fullDep:0,delivered:0,anyBU:false};
+  BUS.forEach(b=>{const x=(r.bu||{})[b]||{};BU_FIELDS.forEach(([f])=>{if(has(x[f])){o[f]+=n(x[f]);o.anyBU=true}})});
+  o.deployed=o.complete+o.fullDep;o.incomplete=Math.max(0,o.required-o.deployed);return o}
+const buDone=x=>n(x.complete)+n(x.fullDep);
+// Request deployment (Inventory Tool requests + RMAS verification):
+//  verified  → 100% (all delivered request POSM deployed, or no request this month)
+//  partial   → deployed qty ÷ delivered qty
+//  not yet verified → not counted (pending)
+function reqScore(r,a){a=a||agg(r);if(r.reqVerify==='verified')return 1;if(r.reqVerify==='partial')return a.delivered>0?clamp(n(r.reqDeployed)/a.delivered):null;return null}
+function verRate(r){return n(r.auditStores)>0?clamp(n(r.auditVerified)/n(r.auditStores)):1}
+function buRate(r,b){const x=(r.bu||{})[b]||{};return n(x.required)>0?clamp(Math.min(buDone(x),n(x.required))/n(x.required)):null}
+
+const KPIS=[
+ {key:'dep',name:'POSM Deployment Execution',short:'Deployment',
+  desc:'Deployment status per BU from the Deployment KPI Tool (Incomplete – Full Deployment = no available stock, counted as complete), plus deployment of the POSM the TS requested and received from the Inventory Tool, verified by RMAS. No request this month = 100% once RMAS verifies.',
+  formula:'Average of: ((Complete + Incomplete Full Dep.) × Audit verification rate) ÷ Target, and Request deployment (RMAS-verified: 100%, or deployed qty ÷ delivered qty)',
+  calc:(r,a)=>{const p=[];if(a.required>0)p.push(clamp(Math.min(a.deployed,a.required)*verRate(r)/a.required));const q=reqScore(r,a);if(q!=null)p.push(q);return avg(p)},
+  check:(r,a)=>{const e=[];BUS.forEach(b=>{const x=(r.bu||{})[b]||{};if(buDone(x)>n(x.required)&&has(x.required))e.push(`${b}: Complete + Incomplete Full Dep. cannot exceed Target.`)});
+    if(n(r.auditVerified)>n(r.auditStores))e.push('Verified stores cannot exceed stores audited.');if(r.reqVerify==='partial'&&n(r.reqDeployed)>a.delivered)e.push('Deployed request POSM cannot exceed delivered qty.');return e}},
+ {key:'rep',name:'POSM Reporting Accuracy & Timeliness',short:'Reporting',
+  desc:'Correct and on-time submission of POSM reports, plus deployments reported with photo proof.',
+  formula:'Average of: On-time ÷ Due, Accurate ÷ Due, Reported with proof ÷ Deployed',
+  calc:(r,a)=>{const p=[];const d=n(r.repDue);if(d>0){p.push(clamp(n(r.repOnTime)/d));p.push(clamp(n(r.repAccurate)/d))}
+    if(a.deployed>0&&has(r.reported))p.push(clamp(n(r.reported)/a.deployed));return avg(p)},
+  check:(r,a)=>{const e=[];if(n(r.repOnTime)>n(r.repDue))e.push('On-time reports cannot exceed reports due.');
+    if(n(r.repAccurate)>n(r.repDue))e.push('Accurate reports cannot exceed reports due.');
+    if(n(r.reported)>a.deployed)e.push('Reported deployments cannot exceed Complete + Incomplete Full Dep.');return e}},
+ {key:'com',name:'Communication',short:'Communication',
+  desc:'Responsiveness to RMAS instructions/concerns, timely escalation of POSM issues, and attendance to meetings/huddles.',
+  formula:'Average of: Responded within SLA ÷ Instructions sent, Attended ÷ Meetings required',
+  calc:(r)=>{const p=[];if(n(r.comSent)>0)p.push(clamp(n(r.comResp)/n(r.comSent)));if(n(r.meetReq)>0)p.push(clamp(n(r.meetAtt)/n(r.meetReq)));return avg(p)},
+  check:(r)=>{const e=[];if(n(r.comResp)>n(r.comSent))e.push('Responded cannot exceed instructions sent.');
+    if(n(r.meetAtt)>n(r.meetReq))e.push('Attended cannot exceed meetings required.');return e}}
+];
+const TIPS={
+  dep:'Close the remaining Incomplete deployments: schedule store visits per BU, confirm install dates with store managers, and make sure every deployed POSM is actually displayed (audit verification affects the score).',
+  rep:'Submit reports on or before the due date, double-check counts before sending, and attach photo proof for every deployment.',
+  com:'Acknowledge RMAS instructions within the SLA, attend all huddles, and escalate POSM issues (missing, damaged, wrong model) the same day.'
+};
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let S, role=lsGet(ROLE_KEY)==='admin'?'admin':'viewer', sheetUrl=CONFIG.KPI_SHEET_URL||lsGet(URL_KEY)||'';
+function load(){try{const x=lsGet(STORE_KEY);if(x){const o=JSON.parse(x);if(o&&o.ts&&o.records)return o}}catch(e){}return null}
+function normalizeState(o){o.weights=o.weights||{...DEFAULT_WEIGHTS};o.grades=o.grades||DEFAULT_GRADES.map(g=>({...g}));
+  o.deductions=o.deductions||DEFAULT_DEDUCTIONS.map(d=>({...d}));o.adminPass=o.adminPass||'admin123';o.sources=Object.assign({inventoryUrl:'',autoPull:true,lastPull:null,deploymentUrl:'',depAutoPull:true,depLastPull:null},o.sources||{});if(CONFIG.INVENTORY_URL)o.sources.inventoryUrl=CONFIG.INVENTORY_URL;if(CONFIG.DEPLOYMENT_URL)o.sources.deploymentUrl=CONFIG.DEPLOYMENT_URL;o.buMap=o.buMap||{};o.deleted=o.deleted||{};o.deletedTs=o.deletedTs||{};return o}
+/* ---- change stamping: every edit gets a timestamp so multi-device merges keep the newest version ---- */
+const SETTING_KEYS=['weights','grades','deductions','adminPass','sources','buMap'];
+const noUpd=o=>{const c=Object.assign({},o);delete c.updated;return JSON.stringify(c)};
+let lastSnap=null;
+function snap(){return {settings:JSON.stringify(SETTING_KEYS.map(k=>S[k])),ts:Object.fromEntries(S.ts.map(t=>[t.id,noUpd(t)])),rec:Object.fromEntries(Object.entries(S.records).map(([k,r])=>[k,noUpd(r)]))}}
+function stamp(){const now=new Date().toISOString();if(!lastSnap){lastSnap=snap();return}
+  if(lastSnap.settings!==JSON.stringify(SETTING_KEYS.map(k=>S[k])))S.settingsUpdated=now;
+  S.ts.forEach(t=>{if(lastSnap.ts[t.id]!==noUpd(t))t.updated=now});Object.keys(lastSnap.ts).forEach(id=>{if(!S.ts.some(t=>t.id===id))S.deletedTs[id]=now});
+  Object.entries(S.records).forEach(([k,r])=>{if(lastSnap.rec[k]!==noUpd(r))r.updated=now});Object.keys(lastSnap.rec).forEach(k=>{if(!S.records[k])S.deleted[k]=now});
+  lastSnap=snap()}
+function save(push=true){stamp();lsSet(STORE_KEY,JSON.stringify(S));if(push)schedulePush()}
+/* Same merge runs in the browser and in Code.gs: newest record / TS / settings win; deletions are remembered. */
+function mergeState(a,b){
+  if(!a||!a.records)return b;if(!b||!b.records)return a;
+  const str=v=>String(v||'');const o={};
+  const base=str(a.settingsUpdated)>=str(b.settingsUpdated)?a:b;
+  ['weights','grades','deductions','adminPass','sources','buMap','settingsUpdated'].forEach(function(k){o[k]=base[k]});
+  const tomb=function(x,y){const t=Object.assign({},x||{});Object.keys(y||{}).forEach(function(k){if(!t[k]||str(y[k])>str(t[k]))t[k]=y[k]});return t};
+  o.deleted=tomb(a.deleted,b.deleted);o.deletedTs=tomb(a.deletedTs,b.deletedTs);
+  o.records={};Object.keys(Object.assign({},a.records,b.records)).forEach(function(k){const x=a.records[k],y=b.records[k];
+    const r=!x?y:!y?x:(str(x.updated)>=str(y.updated)?x:y);if(o.deleted[k]&&str(o.deleted[k])>=str(r.updated))return;o.records[k]=r});
+  const m={};(a.ts||[]).concat(b.ts||[]).forEach(function(t){const c=m[t.id];if(!c||str(t.updated)>str(c.updated))m[t.id]=t});
+  o.ts=Object.keys(m).map(function(id){return m[id]}).filter(function(t){return !(o.deletedTs[t.id]&&str(o.deletedTs[t.id])>=str(t.updated))});
+  return o}
+
+function emptyData(){return normalizeState({ts:[],records:{}})}
+// First run of v4: keep settings (weights, grades, deductions, password, connected tools) from the old version, drop the sample TS & grades.
+function migrate(){try{const x=lsGet(OLD_KEY);if(!x)return null;const o=JSON.parse(x);return normalizeState({ts:[],records:{},weights:o.weights,grades:o.grades,deductions:o.deductions,adminPass:o.adminPass,sources:o.sources})}catch(e){return null}}
+S=load()||migrate()||emptyData();normalizeState(S);lastSnap=snap();lsSet(STORE_KEY,JSON.stringify(S));
+
+/* =====================================================================
+   COMPUTE
+   ===================================================================== */
+function gradeOf(score){if(score==null)return null;const g=[...S.grades].sort((a,b)=>b.min-a.min);return g.find(x=>score>=x.min)||g[g.length-1]}
+function compute(r){
+  const a=agg(r),scores={},lines=[];let wsum=0,tot=0;
+  KPIS.forEach(k=>{const s=k.calc(r,a);scores[k.key]=s;const w=S.weights[k.key]||0;if(s!=null){wsum+=w;tot+=s*w}lines.push({k,s,w,contrib:s!=null?s*w:null})});
+  const weighted=wsum>0?tot/wsum*100:null;
+  const ded=(r.deductions||[]).reduce((x,d)=>x+n(d.pts),0);
+  const final=weighted==null?null:Math.max(0,weighted-ded);
+  const errors=KPIS.flatMap(k=>k.check(r,a));
+  const flags=[];
+  if(a.required>0&&a.incomplete>0)flags.push(['',`${a.incomplete} of ${a.required} deployment(s) still Incomplete — not credited.`]);
+  if(a.fullDep>0)flags.push(['blue',`${a.fullDep} deployment(s) marked Incomplete – Full Deployment (no available POSM stock) — counted as complete.`]);
+  if(!r.reqVerify)flags.push(['blue',a.delivered>0?`Request deployment pending RMAS verification (${a.delivered} request POSM delivered this month).`:'No request this month — becomes 100% once RMAS verifies deployment is complete.']);
+  if(r.reqVerify==='partial'&&a.delivered>n(r.reqDeployed))flags.push(['',`${a.delivered-n(r.reqDeployed)} of ${a.delivered} delivered request POSM not deployed.`]);
+  if(n(r.auditStores)>0&&n(r.auditVerified)<n(r.auditStores))flags.push(['red',`Audit: only ${n(r.auditVerified)} of ${n(r.auditStores)} audited stores had actual display — deployment credit reduced to ${pct(verRate(r))}.`]);
+  if(has(r.reported)&&a.deployed>n(r.reported))flags.push(['',`${a.deployed-n(r.reported)} deployments not reported with photo proof.`]);
+  if(n(r.comSent)>n(r.comResp))flags.push(['',`${n(r.comSent)-n(r.comResp)} RMAS instructions/concerns not responded within SLA.`]);
+  if(ded>0)flags.push(['red',`Deductions applied: −${ded} pts (${(r.deductions||[]).map(d=>esc(d.label)).join('; ')}).`]);
+  const missing=lines.filter(l=>l.s==null).map(l=>l.k.short);
+  if(missing.length&&weighted!=null)flags.push(['blue',`No data for: ${missing.join(', ')} — weights redistributed across the other KPIs.`]);
+  return {a,scores,lines,weighted,ded,final,grade:gradeOf(final),errors,flags,wsum};
+}
+const chip=g=>g?`<span class="chip" style="background:${g.color}">${g.label}</span>`:'<span class="muted">Not graded</span>';
+function ackTag(r){if(!r||compute(r).final==null)return '';const s=r.ack?.status;
+  return s==='acknowledged'?'<span class="tag ack">Acknowledged</span>':s==='disputed'?'<span class="tag dis">Disputed</span>':'<span class="tag pen">Pending ack</span>'}
+function recOf(m,id){return S.records[m+'|'+id]}
+function history(id,upto){return Object.keys(S.records).filter(k=>k.endsWith('|'+id)).map(k=>k.split('|')[0]).filter(m=>!upto||m<=upto).sort()
+  .map(m=>({m,r:S.records[m+'|'+id],c:compute(S.records[m+'|'+id])})).filter(h=>h.c.final!=null)}
+function watch(id,m){const h=history(id,m);const out=[];if(!h.length||h[h.length-1].m!==m)return out;const L=h.length;
+  // Only judge complete grades: a TS still missing Reporting/Communication (not yet encoded) is not put on the watchlist
+  if(h[L-1].c.lines.some(l=>l.s==null)){if(h[L-1].r.ack?.status==='disputed')out.push('Grade disputed by TS');return out}
+  if(L>=3&&h[L-3].c.final>h[L-2].c.final&&h[L-2].c.final>h[L-1].c.final)out.push(`Declining 3 months (${h[L-3].c.final.toFixed(1)} → ${h[L-2].c.final.toFixed(1)} → ${h[L-1].c.final.toFixed(1)})`);
+  if(L>=2&&h[L-1].c.final<80&&h[L-2].c.final<80)out.push('Below 80% for 2 consecutive months');
+  else if(h[L-1].c.final<75)out.push('Poor rating this month');
+  if(h[L-1].r.ack?.status==='disputed')out.push('Grade disputed by TS');
+  return out}
+function monthRank(m){return filteredTs().map(t=>({t,r:recOf(m,t.id)})).filter(x=>x.r).map(x=>({...x,c:compute(x.r)})).filter(x=>x.c.final!=null).sort((a,b)=>b.c.final-a.c.final)}
+
+/* =====================================================================
+   SHELL: controls, roles, nav
+   ===================================================================== */
+const regions=()=>[...new Set(S.ts.map(t=>t.region))].sort();
+// Name matching that survives format differences between tools:
+// "PANGILINAN, JONATHAN" = "Jonathan Pangilinan" = "jonathan  pangilinan." (case, comma order, dots, extra spaces)
+function nameKey(v){return String(v||'').toLowerCase().replace(/[.,;:'"()\-_/]+/g,' ').split(/\s+/).filter(Boolean).sort().join(' ')}
+function findTs(name){const k=nameKey(name);if(!k)return null;return S.ts.find(t=>nameKey(t.name)===k||(t.aliases||[]).some(a=>nameKey(a)===k))||null}
+function ensureTs(name,region){let t=findTs(name);if(t){if((!t.region||t.region==='Unassigned')&&region)t.region=region;return {t,added:false}}
+  t={id:uid(),name:String(name).trim(),region:String(region||'').trim()||'Unassigned'};S.ts.push(t);return {t,added:true}}
+function filteredTs(){const r=$('gRegion').value;return S.ts.filter(t=>!r||t.region===r).sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name))}
+const month=()=>$('gMonth').value||thisMonth();
+$('gMonth').value=thisMonth();
+function fillRegions(){const cur=$('gRegion').value;$('gRegion').innerHTML='<option value="">All regions</option>'+regions().map(r=>`<option ${r===cur?'selected':''}>${esc(r)}</option>`).join('')}
+fillRegions();
+let view='dash',selTs=null;
+function isAdmin(){return role==='admin'}
+function applyRole(){
+  $('roleBtn').textContent=isAdmin()?'Admin · Log out':'Viewer · Admin login';
+  $('nav').querySelectorAll('[data-admin]').forEach(b=>b.classList.toggle('hidden',!isAdmin()));
+  if(!isAdmin()&&['enc','imp','set'].includes(view))go('dash');else render();
+}
+$('roleBtn').onclick=()=>{if(isAdmin()){role='viewer';lsSet(ROLE_KEY,role);applyRole();toast('Logged out — viewer mode');return}
+  modal(`<h3 style="margin-top:0">Admin login</h3><p class="muted" style="font-size:12px">Admin can encode grades, import data, and change settings. Default password: <code>admin123</code> (change it in Settings).</p>
+    <input type="password" id="mPass" placeholder="Password" style="width:100%"><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn sm" onclick="closeModal()">Cancel</button><button class="btn sm pri" id="mGo">Log in</button></div>`);
+  const go_=()=>{if($('mPass').value===S.adminPass){role='admin';lsSet(ROLE_KEY,role);closeModal();applyRole();toast('Admin mode')}else toast('Wrong password')};
+  $('mGo').onclick=go_;$('mPass').onkeydown=e=>{if(e.key==='Enter')go_()};setTimeout(()=>$('mPass')&&$('mPass').focus(),50)};
+function modal(html){$('modalHost').innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="box">${html}</div></div>`}
+function closeModal(){$('modalHost').innerHTML=''}
+function go(v){view=v;[...$('nav').children].forEach(x=>x.classList.toggle('active',x.dataset.v===v));
+  ['dash','enc','card','roll','imp','set'].forEach(x=>$('v-'+x).classList.toggle('hidden',x!==v));render();window.scrollTo(0,0)}
+$('nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.v)};
+$('gMonth').onchange=render;$('gRegion').onchange=render;
+function render(){({dash:renderDash,enc:renderEnc,card:renderCard,roll:renderRoll,imp:renderImp,set:renderSet})[view]()}
+function tsOptions(){const list=filteredTs();if(!selTs||!list.some(t=>t.id===selTs))selTs=list[0]?.id||null;
+  return list.map(t=>`<option value="${t.id}" ${t.id===selTs?'selected':''}>${esc(t.name)} — ${esc(t.region)}</option>`).join('')}
+function openTs(id,v){selTs=id;go(v)}
+
+/* =====================================================================
+   DASHBOARD
+   ===================================================================== */
+function renderDash(){
+  const m=month(),list=filteredTs();
+  const rows=list.map(t=>{const r=recOf(m,t.id);return {t,r,c:r?compute(r):null}});
+  const graded=rows.filter(x=>x.c&&x.c.final!=null);
+  const av=avg(graded.map(x=>x.c.final));
+  const ranked=[...graded].sort((a,b)=>b.c.final-a.c.final);
+  const ackN=graded.filter(x=>x.r.ack?.status==='acknowledged').length, disN=graded.filter(x=>x.r.ack?.status==='disputed').length;
+  const wl=list.map(t=>({t,w:watch(t.id,m)})).filter(x=>x.w.length);
+  const prevAvg=avg(list.map(t=>recOf(addMonths(m,-1),t.id)).filter(Boolean).map(r=>compute(r).final).filter(x=>x!=null));
+  const sumA=f=>graded.reduce((s,x)=>s+x.c.a[f],0);
+  const regs=[...new Set(graded.map(x=>x.t.region))].map(r=>({r,v:avg(graded.filter(x=>x.t.region===r).map(x=>x.c.final)),c:graded.filter(x=>x.t.region===r).length})).sort((a,b)=>b.v-a.v);
+  const buStats=BUS.map(b=>{let req=0,dep=0;graded.forEach(x=>{const y=(x.r.bu||{})[b]||{};req+=n(y.required);dep+=Math.min(buDone(y),n(y.required))});return {b,req,dep,rate:req?dep/req:null}});
+  const gs=[...S.grades].sort((a,b)=>b.min-a.min);const cnt=gs.map(g=>graded.filter(x=>x.c.grade.label===g.label).length);const cm=Math.max(1,...cnt);
+  const repSum=graded.reduce((s,x)=>s+n(x.r.reported),0);const st=[['Target',sumA('required')],['Complete',sumA('complete')],['+ Inc. Full Dep.',sumA('deployed')],...(repSum?[['Reported w/ proof',repSum]]:[])];
+  const withRec=rows.filter(x=>x.r);const vOk=withRec.filter(x=>x.r.reqVerify==='verified').length,vPart=withRec.filter(x=>x.r.reqVerify==='partial').length,vPend=rows.length-vOk-vPart;
+  const mx=Math.max(1,...st.map(s=>s[1]));
+  const medal=['#eab308','#cbd5e1','#d08b4c'];
+  const pod=[ranked[1],ranked[0],ranked[2]];
+  $('v-dash').innerHTML=`
+  ${!S.ts.length?`<div class="card" style="margin-bottom:14px;border-color:var(--accent)"><h3 style="color:var(--accent)">Welcome — let's add your Trade Supervisors</h3>
+    <p style="margin:0 0 10px">No Trade Supervisors yet. ${isAdmin()?'Load them from your Inventory Tool (same master list) or add / import them in Settings.':'Ask the RMAS Admin to set up the Trade Supervisor list.'}</p>
+    ${isAdmin()?`<div class="row"><button class="btn pri" onclick="go('imp')">Sync from Inventory Tool</button><button class="btn sm" onclick="go('set')">Add / import in Settings</button></div>`:''}</div>`:''}
+  <div class="grid cards">
+   <div class="card stat"><h3>TS graded</h3><div class="v">${graded.length}<span class="muted" style="font-size:16px"> / ${list.length}</span></div><div class="s">${monthLabel(m)}</div></div>
+   <div class="card stat"><h3>Average POSM KPI</h3><div class="v">${av==null?'—':av.toFixed(2)+'%'}</div><div class="s">${av==null?'No grades yet':chip(gradeOf(av))} ${prevAvg!=null&&av!=null?`<span style="color:${av>=prevAvg?'var(--good)':'var(--bad)'}">${av>=prevAvg?'▲':'▼'} ${Math.abs(av-prevAvg).toFixed(2)} vs last month</span>`:''}</div></div>
+   <div class="card stat"><h3>Acknowledgment</h3><div class="v">${ackN}<span class="muted" style="font-size:16px"> / ${graded.length}</span></div><div class="s">${disN?`<span class="tag dis">${disN} disputed</span> `:''}${graded.length-ackN-disN?`<span class="tag pen">${graded.length-ackN-disN} pending</span>`:''}</div></div>
+   <div class="card stat"><h3>Watchlist</h3><div class="v" style="color:${wl.length?'var(--warn)':'var(--good)'}">${wl.length}</div><div class="s">TS needing coaching / follow-up</div></div>
+  </div>
+  <div class="mt">
+    <div class="card"><h3>Region ranking</h3>
+      ${regs.length?regs.map((x,i)=>`<div class="kpibar"><div class="n">${i+1}. ${esc(x.r)} <small>${x.c} TS</small></div><div class="bar"><i style="width:${x.v}%;background:${gradeOf(x.v).color}"></i></div><div class="p">${x.v.toFixed(1)}%</div></div>`).join(''):'<div class="empty">No grades yet.</div>'}
+    </div>
+  </div>
+  <div class="grid three mt">
+    <div class="card"><h3>Average score per KPI</h3>${KPIS.map(k=>{const a=avg(graded.map(x=>x.c.scores[k.key]).filter(s=>s!=null));
+      return `<div class="kpibar"><div class="n">${k.short} <small>${S.weights[k.key]}%</small></div><div class="bar"><i style="width:${a==null?0:a*100}%"></i></div><div class="p">${pct(a)}</div></div>`}).join('')}
+      <h3 style="margin-top:16px">Deployment rate per BU</h3>${buStats.map(x=>`<div class="kpibar"><div class="n">${x.b} <small>${x.dep}/${x.req}</small></div><div class="bar"><i style="width:${x.rate==null?0:x.rate*100}%"></i></div><div class="p">${pct(x.rate)}</div></div>`).join('')}</div>
+    <div class="card"><h3>Deployment funnel (all TS)</h3><div class="funnel">${st.map(([l,v],i)=>`<div class="step"><div>${l}</div><div><div class="fb" style="width:${v/mx*100}%">${v.toLocaleString()}</div></div><div class="muted" style="text-align:right">${i?(st[0][1]?(v/st[0][1]*100).toFixed(1)+'%':'—'):'100%'}</div></div>`).join('')}</div>
+      ${(()=>{const T=sumA('required');if(!T)return '';const c1=sumA('complete'),c2=sumA('fullDep'),c3=Math.max(0,T-c1-c2);return `<div style="display:flex;height:12px;border-radius:99px;overflow:hidden;margin-top:12px;border:1px solid var(--line)"><i style="width:${c1/T*100}%;background:#22c55e"></i><i style="width:${c2/T*100}%;background:#3fa9f5"></i><i style="width:${c3/T*100}%;background:#ef4444"></i></div>
+      <div class="row muted" style="font-size:11.5px;margin-top:6px;gap:12px"><span><b style="color:#22c55e">■</b> Complete ${c1}</span><span><b style="color:#3fa9f5">■</b> Inc. Full Dep. (no stock) ${c2}</span><span><b style="color:#ef4444">■</b> Incomplete ${c3}</span></div>`})()}
+      <h3 style="margin-top:16px">Request deployment (RMAS verification)</h3>
+      <div class="row" style="gap:6px;font-size:12px"><span class="tag ack">Verified ${vOk}</span><span class="tag pen">Partial ${vPart}</span><span class="tag">Pending ${vPend}</span>${isAdmin()&&vPend?`<button class="btn sm" onclick="go('enc')">Verify in Encode</button>`:''}</div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Incomplete – Full Deployment (no available stock) counts as complete. Delivered qty (Inventory): ${sumA('delivered').toLocaleString()}.</p></div>
+    <div class="card"><h3>Grade distribution</h3>${gs.map((g,i)=>`<div class="kpibar" style="grid-template-columns:1.4fr 2fr 30px"><div class="n">${g.label}</div><div class="bar"><i style="width:${cnt[i]/cm*100}%;background:${g.color}"></i></div><div class="p">${cnt[i]}</div></div>`).join('')}</div>
+  </div>
+  <div class="card mt"><h3>Watchlist — needs coaching</h3>
+    ${(()=>{const pc=graded.filter(x=>x.c.lines.some(l=>l.s==null)).length;return pc?`<p class="muted" style="font-size:12px;margin:0 0 8px">${pc} TS not judged yet — their grade is still partial (e.g. Reporting / Communication not encoded). They join the watchlist check once all KPIs have data.</p>`:''})()}
+    ${wl.length?`<div class="tbl-wrap"><table><thead><tr><th>Trade Supervisor</th><th>Region</th><th>Reason</th><th class="num">Score</th><th></th></tr></thead><tbody>${wl.map(x=>{const r=recOf(m,x.t.id);const c=r?compute(r):null;
+      return `<tr><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.region)}</td><td style="white-space:normal">${x.w.map(w=>`<span class="tag pen" style="margin:2px">${esc(w)}</span>`).join('')}</td><td class="num">${c?fx(c.final):'—'}</td><td><button class="btn sm" onclick="openTs('${x.t.id}','card')">Open scorecard</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="flag green">No TS on the watchlist this month.</div>'}
+  </div>
+  <div class="card mt">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">TS ranking — ${monthLabel(m)}</h3>
+      <div class="row noprint"><button class="btn sm" id="expMonth">Export month CSV</button></div></div>
+    <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Trade Supervisor</th><th>Region</th>${KPIS.map(k=>`<th class="num">${k.short}<br><span style="font-weight:400">${S.weights[k.key]}%</span></th>`).join('')}<th class="num">Deduct.</th><th class="num">Final</th><th>Grade</th><th>Status</th><th class="noprint"></th></tr></thead><tbody>
+    ${list.length?[...ranked,...rows.filter(x=>!(x.c&&x.c.final!=null))].map((x,i)=>{const g=x.c&&x.c.final!=null;
+      return `<tr><td>${g?i+1:''}</td><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.region)}</td>${KPIS.map(k=>`<td class="num">${x.c?pct(x.c.scores[k.key]):'—'}</td>`).join('')}
+      <td class="num" style="color:${x.c?.ded?'#fca5a5':''}">${x.c?.ded?'−'+x.c.ded:'—'}</td><td class="num"><b>${g?fx(x.c.final):'—'}</b></td><td>${g?chip(x.c.grade):'<span class="muted">Not graded</span>'}</td><td>${ackTag(x.r)}${g&&x.c.lines.some(l=>l.s==null)?' <span class="tag" title="Some KPIs have no data yet">Partial data</span>':''}</td>
+      <td class="noprint">${isAdmin()?`<button class="btn sm" onclick="openTs('${x.t.id}','enc')">${g?'Edit':'Grade'}</button> `:''}${g?`<button class="btn sm" onclick="openTs('${x.t.id}','card')">View</button>`:''}</td></tr>`}).join(''):'<tr><td colspan="12" class="empty">No Trade Supervisors. Add them in Settings.</td></tr>'}
+    </tbody></table></div>
+  </div>`;
+  $('expMonth').onclick=()=>exportCsv(m);
+}
+
+/* =====================================================================
+   ENCODE
+   ===================================================================== */
+let draft={};
+function renderEnc(){
+  const m=month();
+  $('v-enc').innerHTML=`<div class="card" style="margin-bottom:14px"><div class="row">
+    <label class="muted" for="eTs">Trade Supervisor</label><select id="eTs" style="min-width:230px">${tsOptions()}</select>
+    <span class="muted">${monthLabel(m)}</span><span id="eStatus"></span>
+    <div class="row" style="margin-left:auto">${S.sources.inventoryUrl||S.sources.deploymentUrl?'<button class="btn sm" id="ePull">Pull from RMAS tools</button>':''}<button class="btn sm" id="eCopyPrev">Copy last month's targets</button><button class="btn sm danger" id="eClear">Delete grade</button></div></div></div>
+    <div class="grid enc"><div id="eForm"></div>
+      <div class="card sticky"><h3>Live computation</h3><div class="calc" id="eCalc"></div>
+        <div class="final"><div class="v" id="eFinal">—</div><div id="eGrade"></div></div><div id="eFlags"></div>
+        <label class="muted" style="display:block;margin-top:12px;font-size:12px">Remarks / action plan</label>
+        <textarea id="eRemarks" rows="3" style="width:100%;margin-top:4px"></textarea>
+        <button class="btn pri" id="eSave" style="width:100%;margin-top:12px;justify-content:center">Save grade</button></div></div>`;
+  $('eTs').onchange=e=>{selTs=e.target.value;renderEnc()};
+  const id=selTs;
+  if(!id){$('eForm').innerHTML='<div class="card empty">No Trade Supervisor available.</div>';return}
+  const r=recOf(m,id);draft=r?JSON.parse(JSON.stringify(r)):{bu:{},deductions:[],src:{}};draft.src=draft.src||{};draft.deductions=draft.deductions||[];
+  $('eStatus').innerHTML=(r?'<span class="chip" style="background:var(--accent)">Saved</span> ':'<span class="chip" style="background:#64748b">New</span> ')+(r?ackTag(r):'');
+  $('eRemarks').value=draft.remarks||'';
+  const inp=(p)=>{const v=getP(draft,p);const src=draft.src[p];return `<input type="number" min="0" step="1" inputmode="numeric" data-p="${p}" value="${has(v)?v:''}" class="${src?'auto':''}" title="${src?'Auto-filled from '+esc(src):''}">`};
+  const flat=(arr)=>`<div class="fields">${arr.map(([f,l])=>`<div><label>${l}</label>${inp(f)}</div>`).join('')}</div>`;
+  const dedCat=S.deductions.map(d=>{const on=draft.deductions.some(x=>x.label===d.label);return `<label style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:8px 0;font-size:13px;cursor:pointer"><input type="checkbox" data-ded="${esc(d.label)}" data-pts="${d.pts}" ${on?'checked':''}><span>${esc(d.label)}</span><span class="tag dis">−${d.pts}</span></label>`}).join('');
+  const custom=draft.deductions.filter(x=>!S.deductions.some(d=>d.label===x.label));
+  $('eForm').innerHTML=`
+  <div class="sect"><div class="hd"><b>1. ${KPIS[0].name}</b><span>${S.weights.dep}%</span></div><p>${KPIS[0].desc}<br><i>Formula: ${KPIS[0].formula}</i></p>
+    <div class="tbl-wrap"><table class="butbl"><thead><tr><th>BU</th>${BU_FIELDS.map(f=>`<th class="num" style="white-space:normal;min-width:84px">${f[1]}</th>`).join('')}<th class="num">Incomplete</th><th class="num">Rate</th></tr></thead><tbody>
+    ${BUS.map(b=>`<tr><td><b>${b}</b></td>${BU_FIELDS.map(([f])=>`<td>${inp(`bu.${b}.${f}`)}</td>`).join('')}<td class="num" id="inc_${b}" style="color:#fca5a5">—</td><td class="num" id="bur_${b}">—</td></tr>`).join('')}
+    <tr><td class="muted">Total</td>${BU_FIELDS.map(([f])=>`<td class="num" id="tot_${f}">0</td>`).join('')}<td class="num" id="inc_T" style="color:#fca5a5">0</td><td class="num" id="bur_T">—</td></tr></tbody></table></div>
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Target = stores / deployments assigned this month. <b>Incomplete</b> is computed (Target − Complete − Incomplete Full Dep.). <b>Incomplete – Full Deployment</b> = deployed everything that was available; the rest had no POSM stock, so it counts as complete. Request POSM delivered comes from the Inventory Tool (requests marked Delivered this month).</p>
+    <div style="margin-top:12px;border:1px dashed var(--line);border-radius:10px;padding:10px">
+      <div style="font-size:12.5px;margin-bottom:8px"><b>Request deployment — RMAS verification</b> <span class="muted">· Request POSM delivered this month (Inventory Tool): <b id="reqDel">0</b></span></div>
+      <div class="row" style="gap:14px;font-size:13px">
+        <label class="row" style="gap:6px"><input type="radio" name="reqV" value="" ${!draft.reqVerify?'checked':''}> Not yet verified</label>
+        <label class="row" style="gap:6px"><input type="radio" name="reqV" value="verified" ${draft.reqVerify==='verified'?'checked':''}> Verified complete <span class="muted">(all delivered POSM deployed, or no request) = 100%</span></label>
+        <label class="row" style="gap:6px"><input type="radio" name="reqV" value="partial" ${draft.reqVerify==='partial'?'checked':''}> Partially deployed</label></div>
+      <div id="reqPartial" style="margin-top:8px;${draft.reqVerify==='partial'?'':'display:none'}">${flat(FLAT.req)}</div></div>
+    <div style="margin-top:10px"><div class="muted" style="font-size:12px;margin-bottom:6px"><b style="color:var(--text)">Audit verification</b> — from POSM Audit / leader store visits. If blank, deployment is taken as reported.</div>${flat(FLAT.audit)}</div>
+    <div class="res" id="res_dep"></div><div class="err" id="err_dep"></div></div>
+  <div class="sect"><div class="hd"><b>2. ${KPIS[1].name}</b><span>${S.weights.rep}%</span></div><p>${KPIS[1].desc}<br><i>Formula: ${KPIS[1].formula}</i></p>
+    ${flat(FLAT.rep)}<div class="res" id="res_rep"></div><div class="err" id="err_rep"></div></div>
+  <div class="sect"><div class="hd"><b>3. ${KPIS[2].name}</b><span>${S.weights.com}%</span></div><p>${KPIS[2].desc}<br><i>Formula: ${KPIS[2].formula}</i></p>
+    ${flat(FLAT.com)}<div class="res" id="res_com"></div><div class="err" id="err_com"></div></div>
+  <div class="sect"><div class="hd"><b>Deductions / penalties</b><span style="color:#fca5a5">minus points</span></div><p>Subtracted from the weighted score. Edit the list in Settings.</p>
+    ${dedCat}<div id="customDed">${custom.map(x=>`<div class="row" style="margin:6px 0;font-size:13px"><span>${esc(x.label)}</span><span class="tag dis">−${x.pts}</span><button class="btn sm danger" data-rmc="${esc(x.label)}">Remove</button></div>`).join('')}</div>
+    <div class="row" style="margin-top:8px"><input id="cdLabel" placeholder="Other deduction (reason)" style="flex:1;min-width:150px"><input id="cdPts" type="number" min="0" placeholder="pts" style="width:80px"><button class="btn sm" id="cdAdd">Add</button></div></div>
+  ${Object.keys(draft.src).length?`<div class="flag blue">Blue fields were auto-filled from imported RMAS tool data. Editing a field turns it into a manual entry.</div>`:''}`;
+  $('eForm').querySelectorAll('input[name=reqV]').forEach(i=>i.onchange=()=>{draft.reqVerify=i.value;$('reqPartial').style.display=i.value==='partial'?'':'none';liveCalc()});
+  $('eForm').querySelectorAll('input[data-p]').forEach(i=>i.oninput=()=>{setP(draft,i.dataset.p,i.value);delete draft.src[i.dataset.p];i.classList.remove('auto');liveCalc()});
+  $('eForm').querySelectorAll('input[data-ded]').forEach(i=>i.onchange=()=>{const l=i.dataset.ded;draft.deductions=draft.deductions.filter(x=>x.label!==l);if(i.checked)draft.deductions.push({label:l,pts:n(i.dataset.pts)});liveCalc()});
+  const bindRm=()=>$('eForm').querySelectorAll('[data-rmc]').forEach(b=>b.onclick=()=>{draft.deductions=draft.deductions.filter(x=>x.label!==b.dataset.rmc);b.parentElement.remove();liveCalc()});bindRm();
+  $('cdAdd').onclick=()=>{const l=$('cdLabel').value.trim(),p=n($('cdPts').value);if(!l||!p)return toast('Enter reason and points');draft.deductions.push({label:l,pts:p});
+    $('customDed').insertAdjacentHTML('beforeend',`<div class="row" style="margin:6px 0;font-size:13px"><span>${esc(l)}</span><span class="tag dis">−${p}</span><button class="btn sm danger" data-rmc="${esc(l)}">Remove</button></div>`);bindRm();$('cdLabel').value='';$('cdPts').value='';liveCalc()};
+  $('eSave').onclick=saveGrade;
+  if($('ePull'))$('ePull').onclick=async()=>{if(S.sources.deploymentUrl)await pullDeployments(month(),true,month()===thisMonth()?undefined:false);if(S.sources.inventoryUrl)await pullInventory(month(),true);renderEnc()};
+  $('eClear').onclick=()=>{const k=month()+'|'+selTs;if(!S.records[k])return toast('Nothing saved yet');modalConfirm('Delete the saved grade for this TS and month?',()=>{delete S.records[k];save();renderEnc();toast('Grade deleted')})};
+  $('eCopyPrev').onclick=()=>{const p=recOf(addMonths(month(),-1),selTs);if(!p)return toast('No data last month');
+    BUS.forEach(b=>{const v=getP(p,`bu.${b}.required`);if(has(v))setP(draft,`bu.${b}.required`,v)});['repDue','meetReq'].forEach(f=>{if(has(p[f]))draft[f]=p[f]});
+    $('eForm').querySelectorAll('input[data-p]').forEach(i=>{const v=getP(draft,i.dataset.p);i.value=has(v)?v:''});liveCalc();toast('Copied Required per BU, Reports due & Meetings required')};
+  liveCalc();
+}
+function liveCalc(){
+  const c=compute(draft);
+  if($('reqDel'))$('reqDel').textContent=c.a.delivered;
+  BUS.forEach(b=>{const x=(draft.bu||{})[b]||{};$('bur_'+b).textContent=pct(buRate(draft,b));$('inc_'+b).textContent=has(x.required)?Math.max(0,n(x.required)-buDone(x)):'—'});$('inc_T').textContent=c.a.incomplete;
+  BU_FIELDS.forEach(([f])=>$('tot_'+f).textContent=c.a[f]);
+  $('bur_T').textContent=c.a.required?pct(Math.min(c.a.deployed,c.a.required)/c.a.required):'—';
+  KPIS.forEach(k=>{const s=c.scores[k.key];$('res_'+k.key).innerHTML=`<span class="muted">Score: <b>${pct(s,2)}</b></span>${k.key==='dep'?`<span class="muted">Request deployment: <b>${reqScore(draft,c.a)==null?'pending':pct(reqScore(draft,c.a))}</b></span>`:''}${k.key==='dep'&&n(draft.auditStores)>0?`<span class="muted">Audit verification: <b>${pct(verRate(draft))}</b></span>`:''}<span class="muted">Weighted: <b>${s==null?'—':(s*S.weights[k.key]).toFixed(2)}</b></span>`;
+    $('err_'+k.key).textContent=k.check(draft,c.a).join(' ')});
+  $('eCalc').innerHTML=c.lines.map(l=>`<div class="ln"><span>${l.k.short}</span><span>${l.s==null?'<span class="muted">N/A</span>':`${pct(l.s,2)} × ${l.w}% = <b>${l.contrib.toFixed(2)}</b>`}</span></div>`).join('')+
+    `<div class="ln"><span>Weighted score${c.wsum!==100&&c.weighted!=null?` (÷ ${c.wsum}%)`:''}</span><span><b>${fx(c.weighted)}</b></span></div>`+
+    (c.ded?`<div class="ln"><span>Deductions</span><span style="color:#fca5a5"><b>−${c.ded.toFixed(2)}</b></span></div>`:'');
+  $('eFinal').textContent=c.final==null?'—':c.final.toFixed(2)+'%';
+  $('eGrade').innerHTML=c.final==null?'<span class="muted">Enter data to compute</span>':chip(c.grade);
+  $('eFlags').innerHTML=[...c.errors.map(e=>`<div class="flag red">⚠ ${e}</div>`),...c.flags.map(f=>`<div class="flag ${f[0]}">${f[1]}</div>`)].join('');
+  $('eSave').disabled=!!c.errors.length;
+}
+function sig(r){return JSON.stringify([r.reqVerify||'',ALL_PATHS.map(p=>getP(r,p)??''),(r.deductions||[]).map(d=>d.label+d.pts).sort()])}
+function cleanRec(d){const rec={bu:{}};ALL_PATHS.forEach(p=>{const v=getP(d,p);if(has(v))setP(rec,p,n(v))});
+  rec.deductions=(d.deductions||[]).map(x=>({label:String(x.label),pts:n(x.pts)}));rec.src={};Object.keys(d.src||{}).forEach(p=>{if(has(getP(d,p)))rec.src[p]=d.src[p]});
+  if(d.reqVerify)rec.reqVerify=d.reqVerify;if(d.depStores)rec.depStores=d.depStores;rec.remarks=(d.remarks||'').trim();if(d.ack)rec.ack=d.ack;rec.updated=new Date().toISOString();return rec}
+function saveGrade(){draft.remarks=$('eRemarks').value;const c=compute(draft);if(c.errors.length)return toast('Fix the errors first');if(c.final==null)return toast('Enter data for at least one KPI');
+  const k=month()+'|'+selTs,old=S.records[k];const rec=cleanRec(draft);
+  if(old&&old.ack&&sig(old)!==sig(rec)){delete rec.ack;toast('Saved · grade changed, TS must re-acknowledge')}else toast('Saved · '+c.final.toFixed(2)+'% '+c.grade.label);
+  S.records[k]=rec;save();renderEnc()}
+function modalConfirm(msg,fn){modal(`<p style="margin-top:0">${esc(msg)}</p><div class="row" style="justify-content:flex-end"><button class="btn sm" onclick="closeModal()">Cancel</button><button class="btn sm danger" id="mOk">Confirm</button></div>`);$('mOk').onclick=()=>{closeModal();fn()}}
+
+/* =====================================================================
+   SCORECARD
+   ===================================================================== */
+function insights(cur,prev,rank,total){
+  const out=[];const c=cur.c,r=cur.r;
+  const ls=c.lines.filter(l=>l.s!=null).sort((a,b)=>b.s-a.s);
+  if(ls.length){out.push(['g','+',`Strongest area: <b>${ls[0].k.name}</b> at ${pct(ls[0].s)}.`]);
+    const w=ls[ls.length-1];if(ls.length>1&&w.s<0.95)out.push(['w','!',`Focus area: <b>${w.k.name}</b> at ${pct(w.s)}. ${TIPS[w.k.key]}`])}
+  const bus=BUS.map(b=>({b,r:buRate(r,b),x:(r.bu||{})[b]||{}})).filter(x=>x.r!=null).sort((a,b)=>a.r-b.r);
+  if(bus.length>1&&bus[0].r<bus[bus.length-1].r-0.05)out.push(['w','!',`${bus[0].b} deployment is the lowest at ${pct(bus[0].r)} (${buDone(bus[0].x)} of ${n(bus[0].x.required)} done) vs ${bus[bus.length-1].b} at ${pct(bus[bus.length-1].r)}. Prioritize ${bus[0].b} store visits.`]);
+  if(n(r.auditStores)>0&&verRate(r)<1)out.push(['b','A',`Audit found ${n(r.auditStores)-n(r.auditVerified)} of ${n(r.auditStores)} store(s) without actual display, which reduced the deployment credit to ${pct(verRate(r))} of what was reported.`]);
+  if(c.ded)out.push(['w','−',`Deductions of ${c.ded} pts applied. Without them the score would be ${fx(c.weighted)} (${gradeOf(c.weighted).label}).`]);
+  if(prev){const d=c.final-prev.c.final;out.push([d>=0?'g':'w',d>=0?'▲':'▼',`${d>=0?'Improved':'Dropped'} ${Math.abs(d).toFixed(2)} pts vs ${monthLabel(prev.m)}.`])}
+  if(rank)out.push(['b','#',`Ranked <b>${rank}</b> of ${total} graded TS this month${$('gRegion').value?' in '+esc($('gRegion').value):''}.`]);
+  const nextG=[...S.grades].sort((a,b)=>a.min-b.min).find(g=>g.min>c.final);if(nextG)out.push(['b','↑',`Needs +${(nextG.min-c.final).toFixed(2)} pts to reach <b>${nextG.label}</b>.`]);
+  return out;
+}
+function renderCard(){
+  const m=month();
+  $('v-card').innerHTML=`<div class="card noprint" style="margin-bottom:14px"><div class="row">
+    <label class="muted" for="cTs">Trade Supervisor</label><select id="cTs" style="min-width:230px">${tsOptions()}</select>
+    <div class="row" style="margin-left:auto"><button class="btn sm" id="cCopy">Copy summary (Viber / Messenger)</button><button class="btn sm" onclick="window.print()">Print / Save PDF</button></div></div></div><div id="cBody"></div>`;
+  $('cTs').onchange=e=>{selTs=e.target.value;renderCard()};
+  const t=S.ts.find(x=>x.id===selTs);if(!t){$('cBody').innerHTML='<div class="card empty">No Trade Supervisor selected.</div>';return}
+  const hist=history(t.id);
+  const cur=hist.find(h=>h.m===m)||[...hist].reverse().find(h=>h.m<=m);
+  if(!cur){$('cBody').innerHTML=`<div class="card empty">${esc(t.name)} has no grades up to ${monthLabel(m)}. ${isAdmin()?`<button class="btn sm" onclick="openTs('${t.id}','enc')">Grade now</button>`:''}</div>`;$('cCopy').disabled=true;return}
+  const idx=hist.indexOf(cur),prev=idx>0?hist[idx-1]:null;
+  const rk=monthRank(cur.m);const rank=rk.findIndex(x=>x.t.id===t.id)+1;
+  const delta=prev?cur.c.final-prev.c.final:null;
+  const q=Math.floor((+cur.m.slice(5)-1)/3),qMonths=[1,2,3].map(i=>cur.m.slice(0,4)+'-'+String(q*3+i).padStart(2,'0'));
+  const qAvg=avg(hist.filter(h=>qMonths.includes(h.m)).map(h=>h.c.final));
+  const W=1100,H=230,P=44;const lo=Math.min(60,...hist.map(h=>Math.floor(h.c.final/10)*10));
+  const xs=i=>P+(hist.length<2?(W-2*P)/2:i*(W-2*P)/(hist.length-1));const ys=v=>H-P-(v-lo)/(100-lo)*(H-2*P);
+  const path=hist.map((h,i)=>`${i?'L':'M'}${xs(i)},${ys(h.c.final)}`).join('');
+  const r=cur.r,c=cur.c;const ack=r.ack;
+  const ins=insights(cur,prev,rank,rk.length);
+  const icol={g:'#22c55e',w:'#f59e0b',b:'#3fa9f5'};
+  const grid=[lo,...[70,80,90].filter(v=>v>lo),100];
+  $('cBody').innerHTML=`
+  ${cur.m!==m?`<div class="flag blue" style="margin-bottom:14px">No grade for ${monthLabel(m)} — showing latest: ${monthLabel(cur.m)}.</div>`:''}
+  <div class="grid cards">
+    <div class="card stat"><h3>Trade Supervisor</h3><div class="v" style="font-size:20px">${esc(t.name)}</div><div class="s">${esc(t.region)} · Rank ${rank||'—'} of ${rk.length}</div></div>
+    <div class="card stat"><h3>${monthLabel(cur.m)}</h3><div class="v">${c.final.toFixed(2)}%</div><div class="s">${chip(c.grade)} ${ackTag(r)}</div></div>
+    <div class="card stat"><h3>vs previous month</h3><div class="v" style="color:${delta==null?'var(--muted)':delta>=0?'var(--good)':'var(--bad)'}">${delta==null?'—':(delta>=0?'▲ +':'▼ ')+delta.toFixed(2)}</div><div class="s">${prev?monthLabel(prev.m)+': '+prev.c.final.toFixed(2)+'%':'No previous month'}</div></div>
+    <div class="card stat"><h3>Q${q+1} ${cur.m.slice(0,4)} average</h3><div class="v">${fx(qAvg)}</div><div class="s">${qAvg!=null?chip(gradeOf(qAvg)):''}</div></div>
+  </div>
+  <div class="grid two mt">
+    <div class="card"><h3>Computation</h3><div class="tbl-wrap"><table>
+      <thead><tr><th>KPI</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Points</th></tr></thead><tbody>
+      ${c.lines.map((l,i)=>`<tr><td>${i+1}. ${l.k.name}</td><td class="num">${pct(l.s,2)}</td><td class="num">${l.w}%</td><td class="num">${l.contrib==null?'—':l.contrib.toFixed(2)}</td></tr>`).join('')}
+      <tr><td>Weighted score</td><td></td><td class="num">${c.wsum}%</td><td class="num">${fx(c.weighted)}</td></tr>
+      ${(r.deductions||[]).map(d=>`<tr><td style="color:#fca5a5;white-space:normal">Deduction: ${esc(d.label)}</td><td></td><td></td><td class="num" style="color:#fca5a5">−${d.pts}</td></tr>`).join('')}
+      <tr><td><b>Final POSM KPI</b></td><td></td><td></td><td class="num"><b>${c.final.toFixed(2)}%</b></td></tr></tbody></table></div>
+      ${r.remarks?`<p style="margin-top:12px"><span class="muted">RMAS remarks:</span> ${esc(r.remarks)}</p>`:''}
+      ${(r.depStores||[]).length?`<details style="margin-top:12px"${(r.depStores||[]).length<=8?' open':''}><summary style="cursor:pointer;font-size:12.5px"><b>Stores not yet Complete (${r.depStores.length})</b> <span class="muted">— from Deployment KPI Tool</span></summary>
+        <div class="tbl-wrap"><table style="margin-top:6px"><thead><tr><th>Store</th><th>BU</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${r.depStores.map(x=>`<tr><td>${esc(x.store)}</td><td>${x.bu}</td><td>${statusKind(x.status)==='fullDep'?`<span class="tag" style="color:#bae6fd;border-color:#1e4f6e">${esc(x.status)}</span>`:`<span class="tag dis">${esc(x.status)}</span>`}</td><td class="muted" style="white-space:normal">${esc(x.remarks)}</td></tr>`).join('')}</tbody></table></div></details>`:''}
+      ${c.flags.map(f=>`<div class="flag ${f[0]}">${f[1]}</div>`).join('')}</div>
+    <div class="card"><h3>Deployment status per BU</h3><div class="tbl-wrap"><table><thead><tr><th>BU</th>${['required','complete','fullDep'].map(f=>`<th class="num">${BU_SHORT[f]}</th>`).join('')}<th class="num">Incomplete</th><th class="num">Rate</th>${['delivered'].map(f=>`<th class="num">${BU_SHORT[f]}</th>`).join('')}</tr></thead><tbody>
+      ${BUS.map(b=>{const x=(r.bu||{})[b]||{};const V=f=>`<td class="num">${has(x[f])?x[f]:'—'}</td>`;return `<tr><td><b>${b}</b></td>${['required','complete','fullDep'].map(V).join('')}<td class="num" style="color:#fca5a5">${has(x.required)?Math.max(0,n(x.required)-buDone(x)):'—'}</td><td class="num"><b>${pct(buRate(r,b))}</b></td>${['delivered'].map(V).join('')}</tr>`}).join('')}
+      <tr><td class="muted">Total</td>${['required','complete','fullDep'].map(f=>`<td class="num">${c.a[f]}</td>`).join('')}<td class="num" style="color:#fca5a5">${c.a.incomplete}</td><td class="num"><b>${c.a.required?pct(Math.min(c.a.deployed,c.a.required)/c.a.required):'—'}</b></td>${['delivered'].map(f=>`<td class="num">${c.a[f]}</td>`).join('')}</tr></tbody></table></div>
+      ${n(r.auditStores)>0?`<p class="muted" style="font-size:12px">Audit: ${n(r.auditVerified)} of ${n(r.auditStores)} stores verified (${pct(verRate(r))}).</p>`:''}
+      <h3 style="margin-top:14px">Deployment funnel</h3><div class="funnel">${(()=>{const st=[['Target',c.a.required],['Complete',c.a.complete],['+ Inc. Full Dep.',c.a.deployed],...(has(r.reported)?[['Reported w/ proof',n(r.reported)]]:[])];
+        const rq=reqScore(r,c.a);const extra=`<div class="kpibar" style="margin-top:12px"><div class="n">Request deployment <small>${c.a.delivered} delivered · ${r.reqVerify==='verified'?'verified':r.reqVerify==='partial'?n(r.reqDeployed)+' deployed':'pending RMAS'}</small></div><div class="bar"><i style="width:${rq==null?0:rq*100}%"></i></div><div class="p">${rq==null?'—':pct(rq)}</div></div>`;const mx=Math.max(1,...st.map(s=>s[1]));
+        return st.map(([l,v],i)=>`<div class="step"><div>${l}</div><div><div class="fb" style="width:${v/mx*100}%">${v}</div></div><div class="muted" style="text-align:right">${i?(st[0][1]?(v/st[0][1]*100).toFixed(1)+'%':'—'):'100%'}</div></div>`).join('')+'</div>'+extra})()}</div>
+  </div>
+  <div class="grid two mt">
+    <div class="card"><h3>Coaching insights</h3>${ins.map(x=>`<div class="insight"><i style="background:${icol[x[0]]}">${x[1]}</i><div>${x[2]}</div></div>`).join('')}</div>
+    <div class="card"><h3>TS acknowledgment</h3>
+      ${ack?`<div class="flag ${ack.status==='acknowledged'?'green':'red'}" style="margin-top:0"><b>${ack.status==='acknowledged'?'Acknowledged':'Disputed'}</b> · ${new Date(ack.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})}${ack.comment?`<br>“${esc(ack.comment)}”`:''}</div>`:'<div class="flag" style="margin-top:0">Pending — the Trade Supervisor has not yet acknowledged this grade.</div>'}
+      <div class="noprint">
+      <label class="muted" style="display:block;margin-top:12px;font-size:12px">TS comment (required when disputing)</label>
+      <textarea id="ackCmt" rows="2" style="width:100%;margin-top:4px" placeholder="e.g. Noted, will improve AC deployment next month."></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn ok" id="ackOk">I acknowledge this grade</button><button class="btn danger" id="ackNo">Dispute</button>${isAdmin()&&ack?'<button class="btn sm" id="ackReset" style="margin-left:auto">Reset status</button>':''}</div>
+      <p class="muted" style="font-size:11px;margin-bottom:0">When RMAS changes a grade after acknowledgment, the status goes back to Pending.</p></div></div>
+  </div>
+  <div class="card mt"><h3>Monthly trend</h3>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Monthly final score trend">
+      ${grid.map(v=>`<line x1="${P}" x2="${W-P}" y1="${ys(v)}" y2="${ys(v)}" stroke="#1d4556"/><text x="4" y="${ys(v)+4}">${v}%</text>`).join('')}
+      <path d="${path}" fill="none" stroke="#19d3c5" stroke-width="2.5"/>
+      ${hist.map((h,i)=>`<circle cx="${xs(i)}" cy="${ys(h.c.final)}" r="${h.m===cur.m?7:5}" fill="${h.c.grade.color}" stroke="#06141b" stroke-width="2"><title>${monthLabel(h.m)}: ${h.c.final.toFixed(2)}%</title></circle><text x="${xs(i)}" y="${ys(h.c.final)-12}" text-anchor="middle" style="fill:#e6f4f7;font-weight:700">${h.c.final.toFixed(1)}</text><text x="${xs(i)}" y="${H-10}" text-anchor="middle">${monthShort(h.m)}</text>`).join('')}
+    </svg>
+    <div class="tbl-wrap"><table><thead><tr><th>Month</th>${KPIS.map(k=>`<th class="num">${k.short}</th>`).join('')}<th class="num">Deduct.</th><th class="num">Final</th><th>Grade</th><th>Status</th></tr></thead><tbody>
+    ${[...hist].reverse().map(h=>`<tr><td>${monthLabel(h.m)}</td>${KPIS.map(k=>`<td class="num">${pct(h.c.scores[k.key])}</td>`).join('')}<td class="num">${h.c.ded?'−'+h.c.ded:'—'}</td><td class="num"><b>${h.c.final.toFixed(2)}%</b></td><td>${chip(h.c.grade)}</td><td>${ackTag(h.r)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  const setAck=(status)=>{const cm=$('ackCmt').value.trim();if(status==='disputed'&&!cm)return toast('Please write the reason for the dispute');
+    S.records[cur.m+'|'+t.id].ack={status,comment:cm,at:new Date().toISOString()};save();renderCard();toast(status==='acknowledged'?'Grade acknowledged':'Dispute sent to RMAS')};
+  $('ackOk').onclick=()=>setAck('acknowledged');$('ackNo').onclick=()=>setAck('disputed');
+  if($('ackReset'))$('ackReset').onclick=()=>{delete S.records[cur.m+'|'+t.id].ack;save();renderCard();toast('Status reset to Pending')};
+  $('cCopy').onclick=()=>{const tip=c.lines.filter(l=>l.s!=null).sort((a,b)=>a.s-b.s)[0];
+    const txt=`TS POSM KPI — ${monthLabel(cur.m)}\n${t.name} (${t.region})\n\nFinal: ${c.final.toFixed(2)}% — ${c.grade.label}\nRank: ${rank} of ${rk.length}\n\n`+
+      c.lines.map(l=>`• ${l.k.short} (${l.w}%): ${pct(l.s)}`).join('\n')+(c.ded?`\n• Deductions: −${c.ded} pts`:'')+
+      `\n\nPer BU deployment: ${BUS.map(b=>`${b} ${pct(buRate(r,b),0)}`).join(' | ')}`+
+      (delta!=null?`\nVs last month: ${delta>=0?'+':''}${delta.toFixed(2)} pts`:'')+(tip&&tip.s<0.95?`\nFocus: ${tip.k.name}`:'')+(r.remarks?`\nRemarks: ${r.remarks}`:'')+
+      `\n\nPlease acknowledge in the KPI tool. Thank you!`;
+    copyText(txt).then(()=>toast('Summary copied — paste in Viber / Messenger'))};
+}
+
+/* =====================================================================
+   ROLL-UP (Quarterly / Yearly)
+   ===================================================================== */
+let rollYear=null,rollPer=null;
+const PER_LABEL={H1:'1st Half',H2:'2nd Half',FY:'Full Year'};
+function renderRoll(){
+  const years=[...new Set(Object.keys(S.records).map(k=>k.slice(0,4)))].sort();
+  if(!rollYear)rollYear=month().slice(0,4);if(!years.includes(rollYear))years.push(rollYear);
+  if(!rollPer)rollPer='Q'+(Math.floor((+month().slice(5)-1)/3)+1);
+  const PER={Q1:[1,2,3],Q2:[4,5,6],Q3:[7,8,9],Q4:[10,11,12],H1:[1,2,3,4,5,6],H2:[7,8,9,10,11,12],FY:[1,2,3,4,5,6,7,8,9,10,11,12]};
+  const months=PER[rollPer].map(x=>rollYear+'-'+String(x).padStart(2,'0'));
+  const rows=filteredTs().map(t=>{const h=months.map(m=>{const r=recOf(m,t.id);const c=r?compute(r):null;return c&&c.final!=null?{m,c,r}:null});const g=h.filter(Boolean);
+    return {t,h,g,avgF:avg(g.map(x=>x.c.final)),k:Object.fromEntries(KPIS.map(k=>[k.key,avg(g.map(x=>x.c.scores[k.key]).filter(s=>s!=null))])),ded:g.reduce((s,x)=>s+x.c.ded,0),
+      trend:g.length>1?g[g.length-1].c.final-g[0].c.final:null}}).sort((a,b)=>(b.avgF??-1)-(a.avgF??-1));
+  const withG=rows.filter(x=>x.avgF!=null);
+  const regs=[...new Set(withG.map(x=>x.t.region))].map(r=>({r,v:avg(withG.filter(x=>x.t.region===r).map(x=>x.avgF))})).sort((a,b)=>b.v-a.v);
+  const overall=avg(withG.map(x=>x.avgF));
+  const mi=[...withG].filter(x=>x.trend!=null).sort((a,b)=>b.trend-a.trend)[0];
+  const pl=PER_LABEL[rollPer]||rollPer;
+  $('v-roll').innerHTML=`<div class="card noprint" style="margin-bottom:14px"><div class="row">
+    <label class="muted">Year</label><select id="rY">${years.sort().map(y=>`<option ${y===rollYear?'selected':''}>${y}</option>`).join('')}</select>
+    <label class="muted">Period</label><select id="rP">${Object.keys(PER).map(p=>`<option value="${p}" ${p===rollPer?'selected':''}>${PER_LABEL[p]||p}</option>`).join('')}</select>
+    <div class="row" style="margin-left:auto"><button class="btn sm" id="rExp">Export CSV</button><button class="btn sm" onclick="window.print()">Print</button></div></div></div>
+  <div class="grid cards"><div class="card stat"><h3>${pl} ${rollYear} average</h3><div class="v">${fx(overall)}</div><div class="s">${overall!=null?chip(gradeOf(overall)):'No grades in this period'}</div></div>
+    <div class="card stat"><h3>Top TS of the period</h3><div class="v" style="font-size:18px">${withG[0]?esc(withG[0].t.name):'—'}</div><div class="s">${withG[0]?withG[0].avgF.toFixed(2)+'% · '+esc(withG[0].t.region):''}</div></div>
+    <div class="card stat"><h3>Most improved</h3>${mi&&mi.trend>0?`<div class="v" style="font-size:18px">${esc(mi.t.name)}</div><div class="s" style="color:var(--good)">▲ +${mi.trend.toFixed(2)} pts within the period</div>`:'<div class="v">—</div>'}</div>
+    <div class="card stat"><h3>Best region</h3><div class="v" style="font-size:18px">${regs[0]?esc(regs[0].r):'—'}</div><div class="s">${regs[0]?regs[0].v.toFixed(2)+'%':''}</div></div></div>
+  <div class="card mt"><h3>${pl} ${rollYear} ranking — average of monthly final scores</h3><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Trade Supervisor</th><th>Region</th>${months.map(m=>`<th class="num">${monthShort(m)}</th>`).join('')}${KPIS.map(k=>`<th class="num">${k.short}</th>`).join('')}<th class="num">Average</th><th>Grade</th><th class="num">Trend</th></tr></thead><tbody>
+    ${rows.map((x,i)=>`<tr><td>${x.avgF!=null?i+1:''}</td><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.region)}</td>${x.h.map(h=>`<td class="num">${h?`<span style="color:${h.c.grade.color}">${h.c.final.toFixed(1)}</span>`:'<span class="muted">—</span>'}</td>`).join('')}
+      ${KPIS.map(k=>`<td class="num">${pct(x.k[k.key])}</td>`).join('')}<td class="num"><b>${fx(x.avgF)}</b></td><td>${x.avgF!=null?chip(gradeOf(x.avgF)):'<span class="muted">—</span>'}</td>
+      <td class="num" style="color:${x.trend==null?'':x.trend>=0?'var(--good)':'var(--bad)'}">${x.trend==null?'—':(x.trend>=0?'▲ +':'▼ ')+x.trend.toFixed(1)}</td></tr>`).join('')}
+  </tbody></table></div><p class="muted" style="font-size:12px;margin-bottom:0">Average counts only the months the TS was graded. Trend = last graded month minus first graded month in the period.</p></div>
+  <div class="card mt"><h3>Region averages</h3>${regs.map((x,i)=>`<div class="kpibar"><div class="n">${i+1}. ${esc(x.r)}</div><div class="bar"><i style="width:${x.v}%;background:${gradeOf(x.v).color}"></i></div><div class="p">${x.v.toFixed(1)}%</div></div>`).join('')||'<div class="empty">No grades.</div>'}</div>`;
+  $('rY').onchange=e=>{rollYear=e.target.value;renderRoll()};$('rP').onchange=e=>{rollPer=e.target.value;renderRoll()};
+  $('rExp').onclick=()=>download(`TS_POSM_KPI_${rollYear}_${rollPer}.csv`,toCsv([['Rank','Region','Trade Supervisor',...months,...KPIS.map(k=>k.short+' %'),'Deductions','Average %','Grade','Trend'],
+    ...rows.map((x,i)=>[x.avgF!=null?i+1:'',x.t.region,x.t.name,...x.h.map(h=>h?h.c.final.toFixed(2):''),...KPIS.map(k=>x.k[k.key]==null?'':(x.k[k.key]*100).toFixed(2)),x.ded||'',x.avgF==null?'':x.avgF.toFixed(2),x.avgF!=null?gradeOf(x.avgF).label:'',x.trend==null?'':x.trend.toFixed(2)])]),'text/csv');
+}
+
+/* =====================================================================
+   IMPORT CENTER + GOOGLE SHEETS SYNC
+   ===================================================================== */
+const COLS={
+  month:['MONTH','PERIOD','DATE','MONTHYEAR'],ts:['TRADESUPERVISOR','TS','TSNAME','SUPERVISOR'],bu:['BU','BUSINESSUNIT'],region:['REGION'],
+  status:['STATUS','DEPLOYMENTSTATUS','REMARKSSTATUS'],
+  required:['TARGET','TARGETDEPLOYMENTS','TARGETSTORES','REQUIRED','ALLOCATION','TOTAL','TOTALSTORES'],complete:['COMPLETE','COMPLETED','DEPLOYED'],
+  fullDep:['INCOMPLETEFULLDEPLOYMENT','INCOMPLETEFULLDEP','FULLDEPLOYMENT','NOSTOCK','INCFULLDEP'],delivered:['DELIVERED','DELIVEREDQTY','POSMDELIVERED'],
+auditStores:['AUDITEDSTORES','STORESAUDITED','AUDITED'],auditVerified:['AUDITVERIFIED','VERIFIEDSTORES','STORESVERIFIED','VERIFIED'],
+  repDue:['REPORTSDUE'],repOnTime:['REPORTSONTIME'],repAccurate:['REPORTSACCURATE'],reported:['REPORTEDWITHPROOF','REPORTEDWITHPHOTO','WITHPHOTOPROOF','REPORTED'],
+  comSent:['INSTRUCTIONSSENT','CONCERNSSENT'],comResp:['RESPONDEDWITHINSLA','RESPONDED'],meetReq:['MEETINGSREQUIRED','HUDDLESREQUIRED'],meetAtt:['MEETINGSATTENDED','HUDDLESATTENDED']};
+const COL_LABEL={month:'MONTH',ts:'TRADE SUPERVISOR',bu:'BU',region:'REGION',status:'STATUS',required:'TARGET',complete:'COMPLETE',fullDep:'INCOMPLETE FULL DEPLOYMENT',delivered:'DELIVERED',auditStores:'AUDITED STORES',auditVerified:'AUDIT VERIFIED',
+  repDue:'REPORTS DUE',repOnTime:'REPORTS ON TIME',repAccurate:'REPORTS ACCURATE',reported:'REPORTED WITH PROOF',comSent:'INSTRUCTIONS SENT',comResp:'RESPONDED WITHIN SLA',meetReq:'MEETINGS REQUIRED',meetAtt:'MEETINGS ATTENDED'};
+const BU_KEYS=BU_FIELDS.map(f=>f[0]);
+function statusKind(v){const h=normH(v);if(!h)return null;if(h.includes('FULL'))return 'fullDep';if(h.startsWith('INCOMPLETE')||h.startsWith('NOT')||h.startsWith('PENDING'))return 'incomplete';if(h.startsWith('COMPLETE')||h==='DONE'||h==='DEPLOYED')return 'complete';return 'incomplete'}
+const yes=v=>/^(y|yes|1|true|on ?time|ontime|✓|✔)$/i.test(String(v||'').trim());
+function normH(h){return String(h).toUpperCase().replace(/[^A-Z0-9]/g,'')}
+function normMonth(v){v=String(v||'').trim();let x;
+  if((x=v.match(/^(\d{4})[-\/](\d{1,2})/)))return x[1]+'-'+x[2].padStart(2,'0');
+  if((x=v.match(/^(\d{1,2})\/(\d{4})$/)))return x[2]+'-'+x[1].padStart(2,'0');
+  if((x=v.match(/^(\d{1,2})\/\d{1,2}\/(\d{4})/)))return x[2]+'-'+x[1].padStart(2,'0');
+  const d=new Date(/^[A-Za-z]+\s+\d{4}$/.test(v)?'1 '+v:v);if(!isNaN(d))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');return null}
+// BU mapping: admin-defined map first (Import & Sync → Data check), then common Samsung CE names.
+function normBU(v){const raw=String(v||'').toUpperCase().trim();if(!raw)return null;if(BUS.includes(raw))return raw;
+  const mp=(S.buMap||{})[raw];if(mp)return mp==='IGNORE'?null:mp;
+  if(/\b(AC|RAC|SAC|CAC|AIRCON|AIRCONDITIONER|AIR CON|AIR CONDITIONER|WINDFREE|WIND-FREE)\b|AIRCON|AIR COND|WINDFREE/.test(raw))return 'AC';
+  if(/\b(AV|VD|TV|LFD|SIGNAGE)\b|AUDIO|VISUAL|TELEVISION|SOUND|MONITOR|PROJECTOR|QLED|OLED|THE FRAME/.test(raw))return 'AV';
+  if(/\b(HA|DA|REF|WM|MWO)\b|APPLIANCE|HOME|REFRIG|FRIDGE|WASH|LAUNDRY|DRYER|MICRO|COOK|OVEN|DISH|VACUUM|KITCHEN|BESPOKE/.test(raw))return 'HA';
+  return null}
+let pending=null;
+function renderImp(){
+  const src=S.sources,lp=src.lastPull;
+  $('v-imp').innerHTML=`<div class="card" style="margin-bottom:14px"><h3>Connected RMAS tools — automatic data pull</h3>
+    <div class="row" style="margin-bottom:10px"><button class="btn pri" id="pullAll">Pull ALL tools → ${monthLabel(month())}</button><span class="muted" style="font-size:12px">Then check the <b>Data check</b> box below to see what was read and what was skipped.</span></div>
+    <p class="muted" style="font-size:12.5px;margin-top:0">The KPI tool reads data directly from your other RMAS tools' Google Sheets — no export, no upload. Pulled values fill the grade automatically (blue fields) and never overwrite numbers RMAS typed manually.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Tool</th><th>Status</th><th>Fills in the KPI</th></tr></thead><tbody>
+      <tr><td><b>Inventory Tool</b></td><td>${src.inventoryUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal">Request POSM delivered per TS (requests marked <i>Delivered</i> that month) — RMAS then verifies they were deployed; no request = 100% once verified. Also the Trade Supervisor master list.</td></tr>
+      <tr><td><b>Deployment KPI Tool</b></td><td>${src.deploymentUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal" class="muted">Target, Complete, Incomplete, Incomplete Full Deployment per TS per BU</td></tr>
+      <tr><td><b>POSM Audit</b></td><td><span class="tag">Coming soon</span></td><td style="white-space:normal" class="muted">Stores audited, stores with verified display, reported with photo proof</td></tr>
+    </tbody></table></div>
+    <label class="muted" style="font-size:12px;display:block;margin-top:12px">Inventory Tool — Apps Script Web App URL (the same URL your Inventory Tool uses)</label>
+    <div class="row" style="margin-top:4px"><input id="invUrl" value="${esc(src.inventoryUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="invSave">Save &amp; test</button></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="invPull" ${src.inventoryUrl?'':'disabled'}>Pull ${monthLabel(month())} now</button>
+      <button class="btn sm" id="invTs" ${src.inventoryUrl?'':'disabled'}>Sync TS list from Inventory Tool</button>
+      <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="invAuto" ${src.autoPull?'checked':''}> Auto-pull the selected month when the tool opens (Admin)</label></div>
+    <div class="row" style="margin-top:10px"><button class="btn sm" id="bulkVerify">Mark TS with NO request this month as verified complete (100%)</button><span class="muted" style="font-size:11.5px">Only do this after RMAS has checked their deployment.</span></div>
+    <div id="invRes" style="margin-top:10px">${lp?`<div class="flag blue" style="margin-top:0">Last pull: ${esc(lp.month)} · ${new Date(lp.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(lp.summary)}</div>`:''}</div>
+    <p class="muted" style="font-size:11.5px;margin-bottom:0">Optional but recommended: add the small <b>getKpiData</b> action to the Inventory Tool's Code.gs so the pull reads <i>all</i> requests of the month (the standard getData only returns the latest 1,000). <a href="#" id="invAddon" style="color:var(--accent)">Download Inventory add-on</a></p>
+    <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:12px">
+    <label class="muted" style="font-size:12px;display:block">Deployment KPI Tool (POSM KPI Command Center) — Apps Script Web App URL</label>
+    <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull deployment status → ${monthLabel(month())}</button>
+      <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="depAuto" ${src.depAutoPull?'checked':''}> Auto-pull when the tool opens (current month only)</label></div>
+    <div id="depRes" style="margin-top:10px">${src.depLastPull?`<div class="flag blue" style="margin-top:0">Last pull: ${esc(src.depLastPull.month)} · ${new Date(src.depLastPull.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(src.depLastPull.summary)}</div>`:''}</div>
+    <p class="muted" style="font-size:11.5px;margin-bottom:0">The Deployment KPI Tool keeps only the <b>current</b> status per store (no month history), so each pull is a snapshot saved into the selected month. Pull the current month regularly; once the month is over, its grade keeps the last snapshot. Renamed TS (RENAME_TS in MasterChanges) are applied automatically.</p></div>
+  </div>
+  <div class="card" style="margin-bottom:14px" id="diagCard"></div>
+  <div class="grid two">
+   <div class="card"><h3>Import data from RMAS tools</h3>
+    <p class="muted" style="font-size:12.5px;margin-top:0">Upload a CSV export from the Deployment KPI Tool, Inventory Tool, POSM Audit, or any sheet. Columns are detected by name, rows for the same TS / month / BU are <b>summed</b>. Your deployment KPI export works directly: one row per store with a <b>STATUS</b> column (Complete / Incomplete / Incomplete Full Deployment) is counted automatically. Auto-filled fields show in blue on the Encode page.</p>
+    <div class="fields" style="margin-top:10px">
+      <div><label>Source</label><select id="iSrc" style="width:100%"><option>Deployment KPI Tool</option><option>Inventory Tool</option><option>POSM Audit</option><option>Report Tracker</option><option>Other</option></select></div>
+      <div><label>BU if file has no BU column</label><select id="iBU" style="width:100%">${BUS.map(b=>`<option>${b}</option>`).join('')}</select></div>
+      <div><label>Month if file has no MONTH column</label><input type="month" id="iMonth" value="${month()}" style="width:100%"></div>
+    </div>
+    <div class="row" style="margin-top:12px"><label class="btn pri">Choose CSV file<input type="file" id="iFile" accept=".csv" hidden></label><button class="btn sm" id="iTpl">Template (totals)</button><button class="btn sm" id="iTpl2">Template (per store status)</button></div>
+    <label class="row" style="margin-top:10px;font-size:12.5px;gap:8px"><input type="checkbox" id="iAddTs"> Add Trade Supervisors not yet in the list (uses REGION column)</label>
+    <div id="iPrev" style="margin-top:12px"></div>
+    <h3 style="margin-top:16px">Recognized columns</h3>
+    <div style="font-size:12px;column-count:2;column-gap:16px" class="muted">${Object.keys(COLS).map(k=>`<div style="margin:2px 0"><code>${COL_LABEL[k]}</code>${BU_KEYS.includes(k)?' <span class="tag">per BU</span>':''}</div>`).join('')}</div>
+   </div>
+   <div class="card"><h3>Google Sheets sync (all devices)</h3>
+    <p class="muted" style="font-size:12.5px;margin-top:0">Same setup as your Inventory Tool: one Google Sheet + Apps Script. Once connected, every save is pushed automatically and every page load pulls the latest data — just refresh on another device.</p>
+    <label class="muted" style="font-size:12px">Apps Script Web App URL</label>
+    ${CONFIG.KPI_SHEET_URL?`<div class="flag green" style="margin-top:4px">Online mode: URL is set inside the file (CONFIG) — every device syncs automatically.</div><input id="gUrl" type="hidden" value="${esc(sheetUrl)}"><button id="gSave" class="hidden"></button>`:`<div class="row" style="margin-top:4px"><input id="gUrl" value="${esc(sheetUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:200px"><button class="btn sm pri" id="gSave">Connect</button></div>`}
+    <div class="row" style="margin-top:10px"><button class="btn sm" id="gPull" ${sheetUrl?'':'disabled'}>Pull now</button><button class="btn sm" id="gPush" ${sheetUrl?'':'disabled'}>Push now</button><button class="btn sm danger" id="gOff" ${sheetUrl&&!CONFIG.KPI_SHEET_URL?'':'disabled'}>Disconnect</button><span class="sync ${syncState.cls}" id="gStat">${syncState.txt}</span></div>
+    <h3 style="margin-top:16px">Setup (one time, ~3 minutes)</h3>
+    <ol class="steps"><li>Create a new Google Sheet, e.g. <b>RMAS TS POSM KPI DB</b>.</li><li>Extensions → Apps Script → delete the sample code, paste <b>Code.gs</b> (button below) → Save.</li>
+      <li>Deploy → New deployment → type <b>Web app</b> → Execute as <b>Me</b>, Who has access <b>Anyone</b> → Deploy → Authorize.</li><li>Copy the Web App URL (ends in <code>/exec</code>), paste it above, click <b>Connect</b>.</li>
+      <li>The sheet gets a <b>KPI_DATA</b> tab (tool storage — don't edit) and a readable <b>GRADES</b> tab you can use for reports / pivot tables.</li></ol>
+    <button class="btn sm" id="gCode">Download Code.gs</button>
+   </div></div>`;
+  $('iTpl').onclick=()=>{const t0=S.ts[0]||{name:'Juan Dela Cruz',region:'NCR'};download('KPI_import_template.csv',toCsv([Object.keys(COLS).filter(k=>!['month','ts','bu','region','status'].includes(k)).reduce((a,k)=>(a.push(COL_LABEL[k]),a),['MONTH','REGION','TRADE SUPERVISOR','BU']),
+    [month(),t0.region,t0.name,'AV',20,16,2,30,'',6,5,4,4,4,17,10,9,4,4],[month(),t0.region,t0.name,'HA',12,10,1,18,'','','','','','','','','','','']]),'text/csv')};
+  $('iTpl2').onclick=()=>{const t0=S.ts[0]||{name:'Juan Dela Cruz',region:'NCR'};download('KPI_status_template.csv',toCsv([['MONTH','REGION','TRADE SUPERVISOR','STORE','BU','STATUS'],
+    [month(),t0.region,t0.name,'SM Megamall','AV','Complete'],[month(),t0.region,t0.name,'SM North','AV','Incomplete Full Deployment'],[month(),t0.region,t0.name,'Robinsons Galleria','HA','Incomplete'],[month(),t0.region,t0.name,'SM Aura','AC','Complete']]),'text/csv')};
+  $('iFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const rows=parseCsv(await f.text());e.target.value='';if(rows.length<2)return toast('Empty file');prepImport(rows)};
+  $('gSave').onclick=()=>{sheetUrl=$('gUrl').value.trim();lsSet(URL_KEY,sheetUrl);if(!sheetUrl){setSync('','Offline');renderImp();return}
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(sheetUrl))toast('URL should start with https://script.google.com/');
+    pullRemote(true).then(()=>{if(view==='imp')renderImp()})};
+  $('gPull').onclick=()=>pullRemote(true);$('gPush').onclick=()=>pushRemote(true);
+  $('gOff').onclick=()=>{sheetUrl='';lsSet(URL_KEY,'');setSync('','Offline');renderImp();toast('Disconnected — offline mode')};
+  $('gCode').onclick=()=>download('Code.gs',CODE_GS,'text/plain');
+  $('invSave').onclick=async()=>{S.sources.inventoryUrl=$('invUrl').value.trim();save();if(!S.sources.inventoryUrl){renderImp();return toast('Inventory Tool disconnected')}
+    $('invRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
+    try{const d=await fetchInventory(month());renderImp();$('invRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.tradeSupervisors.length} TS, ${d.posmMaster.length} POSM, ${d.requests.length} request rows read${d.lite?'':' (standard getData)'}.</div>`}
+    catch(e){$('invRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Inventory Tool: ${esc(e.message)}. Check that the URL ends in /exec and the deployment access is "Anyone".</div>`}};
+  $('bulkVerify').onclick=()=>{const m=month();const list=S.ts.filter(t=>{const r=recOf(m,t.id);return !(r&&agg(r).delivered>0)&&!(r&&r.reqVerify)});
+    if(!list.length)return toast('No unverified TS without requests this month');
+    modalConfirm(`Mark ${list.length} TS with no request POSM delivered in ${monthLabel(m)} as verified complete (Request deployment = 100%)?`,()=>{list.forEach(t=>{const k=m+'|'+t.id;const r=S.records[k]||{bu:{},deductions:[],src:{},remarks:''};r.reqVerify='verified';S.records[k]=r});save();toast(list.length+' TS verified');render()})};
+  $('invPull').onclick=()=>pullInventory(month(),true);
+  $('invTs').onclick=()=>syncTsFromInventory(true);
+  $('invAuto').onchange=e=>{S.sources.autoPull=e.target.checked;save();toast(e.target.checked?'Auto-pull on':'Auto-pull off')};
+  $('invAddon').onclick=e=>{e.preventDefault();download('Inventory_KPI_addon.gs',INV_ADDON,'text/plain')};
+  $('depSave').onclick=async()=>{S.sources.deploymentUrl=$('depUrl').value.trim();save();if(!S.sources.deploymentUrl){renderImp();return toast('Deployment KPI Tool disconnected')}
+    $('depRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
+    try{const d=await fetchDeployments();const ts=new Set(d.records.map(r=>r.ts.trim().toLowerCase()));renderImp();
+      $('depRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.records.length} store-BU deployment rows, ${ts.size} TS found.</div>`}
+    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Deployment KPI Tool: ${esc(e.message)}. Check that the URL ends in /exec and access is "Anyone".</div>`}};
+  $('depPull').onclick=()=>pullDeployments(month(),true);
+  $('pullAll').onclick=async()=>{await pullAllSources(month(),true);renderDiag()};renderDiag();
+  $('depAuto').onchange=e=>{S.sources.depAutoPull=e.target.checked;save();toast(e.target.checked?'Auto-pull on':'Auto-pull off')};
+}
+function prepImport(rows){
+  const H=rows[0].map(normH);const idx={};const used=new Set();
+  Object.entries(COLS).forEach(([k,al])=>{let i=H.findIndex((h,j)=>!used.has(j)&&al.includes(h));if(i>=0){idx[k]=i;used.add(i)}});
+  Object.entries(COLS).forEach(([k,al])=>{if(idx[k]!=null||['ts','bu','reported','status'].includes(k))return;const i=H.findIndex((h,j)=>!used.has(j)&&!(k==='complete'&&h.includes('INCOMPLETE'))&&al.some(a=>a.length>5&&h.includes(a)));if(i>=0){idx[k]=i;used.add(i)}});
+  const statusMode=idx.status!=null;
+  if(idx.ts==null)return toast('No TRADE SUPERVISOR column found');
+  const fields=Object.keys(idx).filter(k=>!['month','ts','bu','region','status'].includes(k)&&!(statusMode&&['required','complete','fullDep'].includes(k)));if(!fields.length&&!statusMode)return toast('No KPI columns recognized — download the template');
+  const defM=$('iMonth').value,defBU=$('iBU').value;const groups={};let bad=0;
+  rows.slice(1).forEach(r=>{const name=(r[idx.ts]||'').trim();if(!name)return;const m=idx.month!=null?normMonth(r[idx.month]):defM;if(!m){bad++;return}
+    const bu=idx.bu!=null?(normBU(r[idx.bu])||defBU):defBU;const key=m+'|'+nameKey(name);
+    const g=groups[key]=groups[key]||{m,name,region:idx.region!=null?(r[idx.region]||'').trim():'',vals:{}};
+    if(statusMode){const k=statusKind(r[idx.status]);if(k){const P=f=>`bu.${bu}.${f}`;['required','complete','fullDep'].forEach(f=>{g.vals[P(f)]=g.vals[P(f)]||0});g.vals[P('required')]++;if(k!=='incomplete')g.vals[P(k)]++}}
+    fields.forEach(f=>{const raw=String(r[idx[f]]??'').trim();if(!raw)return;const p=BU_KEYS.includes(f)?`bu.${bu}.${f}`:f;g.vals[p]=(g.vals[p]||0)+n(raw.replace(/,/g,''))})});
+  const list=Object.values(groups).map(g=>({...g,t:findTs(g.name)}));
+  pending={list,src:$('iSrc').value};
+  const found=list.filter(x=>x.t).length;
+  $('iPrev').innerHTML=`<div class="flag blue" style="margin-top:0">Detected: ${statusMode?'<b>STATUS per row</b> (Complete / Incomplete / Incomplete Full Deployment → counted per BU)'+(fields.length?', ':''):''}${fields.map(f=>COL_LABEL[f]).join(', ')}${idx.bu==null&&(statusMode||fields.some(f=>BU_KEYS.includes(f)))?` → BU <b>${defBU}</b>`:''}. ${list.length} TS-month group(s): <b>${found} matched</b>, ${list.length-found} unknown TS${bad?`, ${bad} row(s) with unreadable month skipped`:''}.</div>
+    <div class="tbl-wrap" style="max-height:260px;overflow:auto;margin-top:8px"><table><thead><tr><th>Month</th><th>Trade Supervisor</th><th>Status</th><th>Values</th></tr></thead><tbody>
+    ${list.map(x=>`<tr><td>${x.m}</td><td>${esc(x.name)}</td><td>${x.t?'<span class="tag ack">Matched</span>':'<span class="tag pen">Unknown TS</span>'}</td><td class="muted" style="white-space:normal;font-size:11.5px">${Object.entries(x.vals).map(([p,v])=>`${p.startsWith('bu.')?p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]:FIELD_LABEL[p]}: ${v}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="margin-top:10px"><button class="btn pri" id="iApply">Apply import</button><button class="btn sm" id="iCancel">Cancel</button></div>`;
+  $('iCancel').onclick=()=>{pending=null;$('iPrev').innerHTML=''};
+  $('iApply').onclick=applyImport;
+}
+function applyImport(){if(!pending)return;const res=applyGroups(pending.list,pending.src,{addNew:$('iAddTs').checked});save();fillRegions();pending=null;
+  $('iPrev').innerHTML=`<div class="flag green" style="margin-top:0">Imported ${res.upd} TS-month record(s)${res.added?`, added ${res.added} new TS`:''}${res.skip?`, skipped ${res.skip} unknown TS (tick "Add Trade Supervisors" to include them)`:''}${res.reack?`, ${res.reack} grade(s) reset to Pending ack`:''}. Open <b>Encode Grades</b> to review — imported fields are blue.</div>`;toast('Import applied')}
+
+/* ---------- Data check (what each pull read, used and skipped) ---------- */
+const DIAG={},TSC={};
+const tally=(o,k)=>{k=String(k===undefined||k===null||k===''?'(blank)':k);o[k]=(o[k]||0)+1};
+function newDiag(src,m){return DIAG[src]={src,month:m,at:new Date(),read:0,used:0,skip:{},badBU:{},status:{},months:{},note:''}}
+/* ---------- Inventory Tool connector ---------- */
+async function fetchInventory(m){const u=S.sources.inventoryUrl;if(!u)throw new Error('No Inventory Tool URL');const q=u.includes('?')?'&':'?';
+  let d=null,lite=false;
+  try{const r=await fetch(u+q+'action=getKpiData&month='+encodeURIComponent(m)+'&t='+Date.now());const j=await r.json();if(j&&Array.isArray(j.requests)&&!j.error){d=j;lite=true}}catch(e){}
+  if(!d){const r=await fetch(u+q+'action=getData&t='+Date.now());d=await r.json();if(!d||!Array.isArray(d.requests))throw new Error(d&&d.error?d.error:'Unexpected response')}
+  d.tradeSupervisors=d.tradeSupervisors||[];d.posmMaster=d.posmMaster||[];d.lite=lite;return d}
+function monthOf(v){if(!v)return '';const s=String(v);if(/^\d{4}-\d{2}/.test(s))return s.slice(0,7);const d=new Date(s);return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+async function pullInventory(m,manual){
+  if(!S.sources.inventoryUrl)return;const box=$('invRes');if(box)box.innerHTML='<div class="flag blue" style="margin-top:0">Pulling from Inventory Tool…</div>';
+  try{const d=await fetchInventory(m);
+    const tsById={};d.tradeSupervisors.forEach(t=>tsById[String(t.id)]=t);
+    const buByCode={};d.posmMaster.forEach(p=>buByCode[String(p.code)]=normBU(p.bu));
+    const D=newDiag('inv',m);D.read=d.requests.length;const rawBu={};d.posmMaster.forEach(p=>rawBu[String(p.code)]=p.bu);
+    d.requests.forEach(r=>{tally(D.status,r.status);if(String(r.status).toLowerCase()==='delivered')tally(D.months,monthOf(r.dateDelivered)||'(no date)')});
+    if(!d.lite&&d.requests.length>=1000)D.note='Only the latest 1,000 requests were returned by getData — install the Inventory add-on to read all of them.';
+    const del=d.requests.filter(r=>{if(String(r.status).toLowerCase()!=='delivered'){tally(D.skip,'status not Delivered');return false}if(monthOf(r.dateDelivered)!==m){tally(D.skip,'delivered in another month');return false}return true});
+    const groups={};let noBU=0;
+    del.forEach(r=>{const tsRec=tsById[String(r.ts)];const name=String(tsRec?tsRec.name:r.ts||'').trim();if(!name){tally(D.skip,'no Trade Supervisor');return}const bu=buByCode[String(r.posmCode)];
+      if(!bu){noBU++;tally(D.skip,'BU not recognized');tally(D.badBU,rawBu[String(r.posmCode)]===undefined?'(POSM code not in master: '+r.posmCode+')':rawBu[String(r.posmCode)]);return}D.used++;
+      const g=groups[nameKey(name)]=groups[nameKey(name)]||{m,name,region:tsRec?tsRec.region:'',vals:{}};const p=`bu.${bu}.delivered`;g.vals[p]=(g.vals[p]||0)+n(r.qty)});
+    // TS with no deliveries this month but active in Inventory → Delivered = 0 is NOT written (unknown vs zero), so we only fill who had deliveries
+    const res=applyGroups(Object.values(groups),'Inventory Tool',{respectManual:true,addNew:true});
+    const partial=!d.lite&&d.requests.length>=1000;
+    const summary=`${del.length} delivered request line(s) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in KPI list (${res.skipped.slice(0,3).map(esc).join(', ')}${res.skip>3?'…':''})`:''}${noBU?`, ${noBU} line(s) with unknown BU`:''}${partial?' · ⚠ only latest 1,000 requests read — install the add-on':''}`;
+    S.sources.lastPull={month:m,at:new Date().toISOString(),summary};save();
+    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU||partial?'':'green'}" style="margin-top:0">Inventory Tool · ${esc(monthLabel(m))}: ${summary}.${res.skip?' Use <b>Sync TS list</b> to add missing TS.':''}</div>`;
+    if(manual)toast('Pulled from Inventory Tool');renderDiag();if(view!=='imp')render();return res}
+  catch(e){if(box)box.innerHTML=`<div class="flag red" style="margin-top:0">Pull failed: ${esc(e.message)}</div>`;if(manual)toast('Pull failed: '+e.message)}}
+async function syncTsFromInventory(manual){
+  try{const d=await fetchInventory(month());let add=0,reg=0;
+    TSC.inv={total:d.tradeSupervisors.length,active:d.tradeSupervisors.filter(t=>(t.status||'active')==='active').length,inactive:d.tradeSupervisors.filter(t=>(t.status||'active')!=='active').map(t=>t.name+' ('+t.status+')')};
+    d.tradeSupervisors.filter(t=>(t.status||'active')==='active'&&String(t.name||'').trim()).forEach(t=>{const name=String(t.name).trim();const ex=findTs(name);
+      if(!ex){S.ts.push({id:uid(),name,region:String(t.region||'Unassigned').trim()||'Unassigned'});add++}else if(t.region&&ex.region!==t.region){ex.region=String(t.region).trim();reg++}});
+    save();fillRegions();const msg=`TS list synced: ${add} added${reg?`, ${reg} region(s) updated`:''}. KPI tool now has ${S.ts.length} TS.`;
+    if($('invRes'))$('invRes').innerHTML=`<div class="flag green" style="margin-top:0">${msg}</div>`;if(manual)toast(msg)}
+  catch(e){if(manual)toast('Sync failed: '+e.message)}}
+/* ---------- Deployment KPI Tool connector (POSM KPI Command Center) ---------- */
+async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw new Error('No Deployment KPI Tool URL');
+  const r=await fetch(u+(u.includes('?')?'&':'?')+'action=getAll&t='+Date.now());const d=await r.json();if(!d||d.ok===false||!Array.isArray(d.records))throw new Error(d&&d.error?d.error:'Unexpected response');
+  d.masterChanges=d.masterChanges||[];return d}
+let depUnknown=[];
+async function pullDeployments(m,manual,confirmed){
+  if(!S.sources.deploymentUrl)return;
+  if(m!==thisMonth()&&!confirmed){if(!manual)return;return modalConfirm(`The Deployment KPI Tool only has TODAY's status (no month history). Save today's status into ${monthLabel(m)}?`,()=>pullDeployments(m,true,true))}
+  const box=$('depRes');if(box)box.innerHTML='<div class="flag blue" style="margin-top:0">Pulling deployment status…</div>';
+  try{const d=await fetchDeployments();
+    // apply TS renames from MasterChanges (oldest first)
+    let ren=0;d.masterChanges.filter(c=>c.action==='RENAME_TS'&&c.oldTS&&c.ts).sort((a,b)=>String(a.timestamp).localeCompare(String(b.timestamp))).forEach(c=>{
+      const o=findTs(c.oldTS);if(o&&!findTs(c.ts)){o.aliases=[...new Set([...(o.aliases||[]),o.name])];o.name=c.ts.trim();ren++}});
+    TSC.dep={active:new Set(d.records.map(r=>nameKey(r.ts)).filter(Boolean)).size};
+    const groups={};let noBU=0;const counts={complete:0,fullDep:0,incomplete:0};const D=newDiag('dep',m);D.read=d.records.length;
+    D.note='Status → Complete: '+Object.keys(d.records.reduce((a,r)=>(statusKind(r.status)==='complete'&&(a[r.status]=1),a),{})).join(', ')+' · Incomplete Full Dep.: '+Object.keys(d.records.reduce((a,r)=>(statusKind(r.status)==='fullDep'&&(a[r.status]=1),a),{})).join(', ');
+    d.records.forEach(rec=>{tally(D.status,rec.status);const name=rec.ts.trim();if(!name){tally(D.skip,'no Trade Supervisor');return}const bu=normBU(rec.bu);if(!bu){noBU++;tally(D.skip,'BU not recognized');tally(D.badBU,rec.bu);return}D.used++;const k=statusKind(rec.status)||'incomplete';counts[k]++;
+      const g=groups[nameKey(name)]=groups[nameKey(name)]||{m,name,region:rec.region.trim(),vals:{},stores:[],seen:new Set()};g.seen.add(bu);
+      const P=f=>`bu.${bu}.${f}`;['required','complete','fullDep'].forEach(f=>{if(g.vals[P(f)]==null)g.vals[P(f)]=0});g.vals[P('required')]++;if(k!=='incomplete')g.vals[P(k)]++;
+      if(k!=='complete')g.stores.push({store:rec.store,bu,status:rec.status,remarks:rec.remarks||''})});
+    Object.values(groups).forEach(g=>BUS.forEach(b=>{if(!g.seen.has(b))['required','complete','fullDep'].forEach(f=>g.vals[`bu.${b}.${f}`]=null)}));
+    const list=Object.values(groups);
+    const res=applyGroups(list,'Deployment KPI Tool',{respectManual:true,addNew:true,extra:(r,x)=>{const a=JSON.stringify(r.depStores||[]),b=JSON.stringify(x.stores);r.depStores=x.stores;return a!==b}});
+    depUnknown=list.filter(x=>res.skipped.includes(x.name)).map(x=>({name:x.name,region:x.region}));
+    const summary=`${d.records.length} store rows (${counts.complete} Complete, ${counts.fullDep} Inc. Full Dep., ${counts.incomplete} Incomplete) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${ren?`, ${ren} TS renamed`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in KPI list`:''}${noBU?`, ${noBU} row(s) with unknown BU`:''}`;
+    S.sources.depLastPull={month:m,at:new Date().toISOString(),summary};save();fillRegions();
+    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU?'':'green'}" style="margin-top:0">Deployment KPI Tool → ${esc(monthLabel(m))}: ${summary}.
+      ${depUnknown.length?`<br>Not in KPI list: ${depUnknown.slice(0,8).map(x=>esc(x.name)).join(', ')}${depUnknown.length>8?'…':''} <button class="btn sm" id="depAddTs" style="margin-left:6px">Add these ${depUnknown.length} TS &amp; pull again</button>`:''}</div>`;
+    if($('depAddTs'))$('depAddTs').onclick=()=>{depUnknown.forEach(x=>{ensureTs(x.name,x.region)});save();fillRegions();pullDeployments(m,true,true)};
+    if(manual)toast('Deployment status pulled');renderDiag();if(view!=='imp')render();return res}
+  catch(e){if(box)box.innerHTML=`<div class="flag red" style="margin-top:0">Pull failed: ${esc(e.message)}</div>`;if(manual)toast('Pull failed: '+e.message)}}
+async function pullAllSources(m,manual){const src=S.sources;
+  if(src.inventoryUrl)await syncTsFromInventory(false);
+  if(src.deploymentUrl)await pullDeployments(m,manual,m===thisMonth()?undefined:!manual);
+  if(src.inventoryUrl)await pullInventory(m,manual);
+  if(manual)toast('All connected tools pulled — see Data check')}
+function renderDiag(){const box=$('diagCard');if(!box)return;const names={dep:'Deployment KPI Tool',inv:'Inventory Tool'};
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]);
+  const list=o=>top(o).map(([k,v])=>`<span class="tag" style="margin:2px">${esc(k)}: ${v}</span>`).join('')||'<span class="muted">—</span>';
+  const bad=new Set();Object.values(DIAG).forEach(D=>Object.keys(D.badBU).forEach(k=>{if(!k.startsWith('(POSM code'))bad.add(k)}));
+  const blocks=['dep','inv'].filter(k=>DIAG[k]).map(k=>{const D=DIAG[k];return `<div class="sect" style="margin:10px 0 0">
+    <div class="hd"><b>${names[k]}</b><span>${D.used} of ${D.read} rows used · ${esc(monthLabel(D.month))}</span></div>
+    ${D.note?`<p style="margin:4px 0 8px">${esc(D.note)}</p>`:''}
+    <div style="font-size:12px;margin:4px 0"><span class="muted">Skipped:</span> ${list(D.skip)}</div>
+    ${Object.keys(D.badBU).length?`<div style="font-size:12px;margin:4px 0"><span class="muted">Unrecognized BU values:</span> ${list(D.badBU)}</div>`:''}
+    <div style="font-size:12px;margin:4px 0"><span class="muted">Status values found:</span> ${list(D.status)}</div>
+    ${Object.keys(D.months).length?`<div style="font-size:12px;margin:4px 0"><span class="muted">Delivered months:</span> ${list(D.months)}</div>`:''}</div>`}).join('');
+  const tsBlock=Object.keys(TSC).length?`<div class="sect" style="margin:10px 0 0"><div class="hd"><b>Trade Supervisors per tool</b><span>KPI tool list: ${S.ts.length} TS</span></div>
+    <div style="font-size:12.5px">${TSC.inv?`Inventory Tool: <b>${TSC.inv.active}</b> active${TSC.inv.inactive.length?` (+${TSC.inv.inactive.length} deleted/inactive: ${TSC.inv.inactive.slice(0,6).map(esc).join(', ')}${TSC.inv.inactive.length>6?'…':''})`:''} · `:''}${TSC.dep?`Deployment KPI Tool: <b>${TSC.dep.active}</b>`:''}</div>
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">The KPI list = everyone found in any of the tools (same person with different spelling is matched automatically). If a TS is missing here, he/she is not in any tool yet — add in Settings.</p></div>`:'';
+  box.innerHTML=`<h3>Data check — what was pulled and what was skipped</h3>${tsBlock}${blocks||'<p class="muted" style="margin:0">Click <b>Pull ALL tools</b> above to see a breakdown per tool.</p>'}
+    ${bad.size?`<div class="sect" style="margin-top:12px;border-color:var(--warn)"><div class="hd"><b>Map unrecognized BU names</b><span style="color:var(--warn)">rows with these BUs are skipped</span></div>
+      <p>Tell the tool which BU each name belongs to, then pull again.</p>
+      ${[...bad].map(b=>`<div class="row" style="margin:6px 0"><code style="min-width:160px">${esc(b)}</code><select data-bumap="${esc(b)}"><option value="">— choose —</option>${[...BUS,'IGNORE'].map(x=>`<option ${((S.buMap||{})[String(b).toUpperCase()]===x)?'selected':''}>${x}</option>`).join('')}</select></div>`).join('')}
+      <button class="btn pri sm" id="buMapSave" style="margin-top:6px">Save mapping &amp; pull again</button></div>`:''}
+    ${Object.keys(S.buMap||{}).length?`<p class="muted" style="font-size:11.5px;margin-bottom:0">Saved BU mapping: ${Object.entries(S.buMap).map(([k,v])=>esc(k)+' → '+v).join(', ')} <a href="#" id="buMapClear" style="color:var(--accent)">clear</a></p>`:''}`;
+  if($('buMapSave'))$('buMapSave').onclick=async()=>{S.buMap=Object.assign({},S.buMap||{});document.querySelectorAll('[data-bumap]').forEach(sel=>{if(sel.value)S.buMap[String(sel.dataset.bumap).toUpperCase()]=sel.value});save();await pullAllSources(month(),true);renderDiag()};
+  if($('buMapClear'))$('buMapClear').onclick=e=>{e.preventDefault();S.buMap={};save();renderDiag();toast('BU mapping cleared')}}
+/* shared: apply grouped values {m,name,region,vals} into records */
+function applyGroups(list,srcName,opt={}){let upd=0,added=0,skip=0,reack=0,kept=0;const skipped=[];const stamp=srcName+' · '+new Date().toLocaleDateString('en');
+  list.forEach(x=>{let t=findTs(x.name);
+    if(!t){if(!opt.addNew){skip++;skipped.push(x.name);return}t=ensureTs(x.name,x.region).t;added++}
+    const k=x.m+'|'+t.id;const r=S.records[k]?JSON.parse(JSON.stringify(S.records[k])):{bu:{},deductions:[],src:{},remarks:''};r.src=r.src||{};const before=sig(r);let changed=false;
+    Object.entries(x.vals).forEach(([p,v])=>{const cur=getP(r,p);
+      if(v===null){if(has(cur)&&r.src[p]&&r.src[p].startsWith(srcName)){setP(r,p,undefined);delete r.src[p];changed=true}return}
+      if(opt.respectManual&&has(cur)&&!r.src[p]){kept++;return}if(cur!==v||!r.src[p])changed=true;setP(r,p,v);r.src[p]=stamp});
+    if(opt.extra&&opt.extra(r,x))changed=true;
+    if(!changed)return;if(r.ack&&sig(r)!==before){delete r.ack;reack++}r.updated=new Date().toISOString();S.records[k]=r;upd++});
+  return {upd,added,skip,reack,kept,skipped}}
+const INV_ADDON=`/**
+ * ADD-ON for the RMAS POSM Inventory Tool Code.gs — lets the TS POSM KPI tool
+ * read ALL requests of a given month (getData only returns the latest 1,000).
+ *
+ * 1) In doGet(), add this line next to the other "if (action === ...)" lines:
+ *
+ *      if (action === 'getKpiData') return jsonOut_(getKpiData_(e.parameter.month));
+ *
+ * 2) Paste the function below anywhere in Code.gs.
+ * 3) Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
+ *    (Same URL — no need to change anything in the Inventory Tool.)
+ */
+function getKpiData_(month) {
+  const m = String(month || '');
+  const inMonth = v => String(normalizeDateValue_(v) || '').slice(0, 7) === m;
+  return {
+    requests: readTable_('requests')
+      .filter(r => !m || inMonth(r.dateDelivered) || inMonth(r.dateCreated))
+      .map(r => ({ id: r.id, posmCode: r.posmCode, qty: Number(r.qty) || 0, store: r.store, ts: r.ts, status: r.status,
+                   dateCreated: normalizeDateValue_(r.dateCreated), dateDelivered: normalizeDateValue_(r.dateDelivered), dueDate: normalizeDateValue_(r.dueDate) })),
+    posmMaster: readTable_('posm').map(r => ({ code: r.code, bu: r.bu })),
+    tradeSupervisors: readTable_('tradeSupervisors').map(r => ({ id: r.id, name: r.name, region: r.region, status: r.status || 'active' })),
+    stores: readTable_('stores').map(r => ({ id: r.id, name: r.name, tsId: r.tsId, region: r.region, status: r.status || 'active' }))
+  };
+}
+`;
+let syncState={cls:'',txt:'Offline'},pushT=null;
+function setSync(cls,txt){syncState={cls,txt};$('syncStat').className='sync '+cls;$('syncStat').textContent=txt;if($('gStat')){$('gStat').className='sync '+cls;$('gStat').textContent=txt}}
+function schedulePush(){if(!sheetUrl)return;clearTimeout(pushT);setSync('','Saving…');pushT=setTimeout(()=>pushRemote(false),1200)}
+function flatRows(){const head=['Month','Region','Trade Supervisor',...BU_PATHS.map(p=>p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]),...FLAT_KEYS.map(f=>FIELD_LABEL[f]),...KPIS.map(k=>k.short+' %'),'Weighted %','Deductions','Final %','Grade','Acknowledgment','TS Comment','Remarks'];
+  const out=[head];const months=[...new Set(Object.keys(S.records).map(k=>k.split('|')[0]))].sort();
+  const all=[];months.forEach(m=>[...S.ts].sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name)).forEach(t=>all.push([m+'|'+t.id,S.records[m+'|'+t.id]||null])));
+  all.forEach(([k,r])=>{const [m,id]=k.split('|');const t=S.ts.find(x=>x.id===id);if(!t)return;if(!r){out.push([m,t.region,t.name,...BU_PATHS.map(()=>''),...FLAT_KEYS.map(()=>''),...KPIS.map(()=>''),'','','','Not graded','','','']);return}const c=compute(r);
+    out.push([m,t.region,t.name,...BU_PATHS.map(p=>getP(r,p)??''),...FLAT_KEYS.map(f=>r[f]??''),...KPIS.map(k=>c.scores[k.key]==null?'':+(c.scores[k.key]*100).toFixed(2)),c.weighted==null?'':+c.weighted.toFixed(2),c.ded||'',c.final==null?'':+c.final.toFixed(2),c.grade?.label||'',r.ack?.status||(c.final!=null?'pending':''),r.ack?.comment||'',r.remarks||''])});return out}
+const nowT=()=>new Date().toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'});
+// Adopt a merged state from the server without losing edits made meanwhile; re-render safely (never while typing a grade).
+function adopt(remote){const before=JSON.stringify(S);S=normalizeState(mergeState(remote,S));lastSnap=snap();lsSet(STORE_KEY,JSON.stringify(S));
+  const changed=before!==JSON.stringify(S);if(changed){fillRegions();if(view!=='enc'&&view!=='set'&&!$('modalHost').innerHTML)render()}return changed}
+function localAhead(R,L){const str=v=>String(v||'');if(str(L.settingsUpdated)>str(R.settingsUpdated))return true;
+  if(Object.entries(L.records).some(([k,r])=>!R.records[k]||str(r.updated)>str(R.records[k].updated)))return true;
+  const rt=Object.fromEntries((R.ts||[]).map(t=>[t.id,t]));if(L.ts.some(t=>!rt[t.id]||str(t.updated)>str(rt[t.id].updated)))return true;
+  const d=(x,y)=>Object.keys(x||{}).some(k=>!(y||{})[k]);return d(L.deleted,R.deleted)||d(L.deletedTs,R.deletedTs)}
+let pushing=false,pushAgain=false;
+async function pushRemote(manual){if(!sheetUrl)return;if(pushing){pushAgain=true;return}pushing=true;setSync('','Saving…');
+  try{const res=await fetch(sheetUrl,{method:'POST',body:JSON.stringify({action:'save',data:S,rows:flatRows()})});const j=await res.json();if(!j.ok)throw new Error(j.error||'Save failed');
+    if(j.data)adopt(j.data);setSync('on','Synced '+nowT());if(manual)toast('Pushed to Google Sheets')}
+  catch(e){setSync('err','Sync error — will retry');if(manual)toast('Sync failed: '+e.message);clearTimeout(pushT);pushT=setTimeout(()=>pushRemote(false),30000)}
+  finally{pushing=false;if(pushAgain){pushAgain=false;schedulePush()}}}
+async function pullRemote(manual){if(!sheetUrl)return;if(!manual&&pushing)return;setSync('','Loading…');
+  try{const res=await fetch(sheetUrl+(sheetUrl.includes('?')?'&':'?')+'action=load&t='+Date.now());const j=await res.json();if(!j.ok)throw new Error(j.error||'Load failed');
+    if(j.data&&j.data.ts&&j.data.records){const ahead=localAhead(j.data,S);adopt(j.data);setSync('on','Synced '+nowT());if(manual)toast('Loaded latest data from Google Sheets');
+      if(ahead)schedulePush()} // this device had edits the sheet doesn't have yet (e.g. saved while offline)
+    else{setSync('on','Connected');await pushRemote(false);if(manual)toast('Connected — sheet was empty, uploaded current data')}}
+  catch(e){setSync('err','Offline — changes kept on this device');if(manual)toast('Could not reach the sheet: '+e.message)}}
+// keep every open device fresh: pull when the tab comes back into view, and every 2 minutes while visible
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pullRemote(false)});
+setInterval(()=>{if(document.visibilityState==='visible')pullRemote(false)},120000);
+
+const CODE_GS=`/**
+ * RMAS VISTA — TS POSM KPI Grading backend (Google Apps Script)
+ * Paste into Extensions > Apps Script of a Google Sheet, then
+ * Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+ */
+const DATA_SHEET = 'KPI_DATA';   // tool storage (do not edit)
+const VIEW_SHEET = 'GRADES';     // readable table for reports
+const CHUNK = 40000;
+
+function doGet(e) {
+  try { return out_({ ok: true, data: load_() }); }
+  catch (err) { return out_({ ok: false, error: String(err) }); }
+}
+
+function doPost(e) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const body = JSON.parse(e.postData.contents);
+    if (body.action === 'save') {
+      // Merge with what other devices saved (newest edit wins per record / TS; deletions kept)
+      const merged = mergeState(load_(), body.data);
+      save_(merged);
+      if (body.rows) writeView_(body.rows);
+      return out_({ ok: true, savedAt: new Date().toISOString(), data: merged });
+    }
+    return out_({ ok: false, error: 'Unknown action' });
+  } catch (err) {
+    return out_({ ok: false, error: String(err) });
+  } finally { lock.releaseLock(); }
+}
+
+function sheet_(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheetByName(name) || ss.insertSheet(name);
+}
+
+function load_() {
+  const sh = sheet_(DATA_SHEET);
+  const n = sh.getLastRow();
+  if (!n) return null;
+  const txt = sh.getRange(1, 1, n, 1).getValues().map(r => String(r[0]).slice(1)).join('');
+  return txt ? JSON.parse(txt) : null;
+}
+
+function save_(data) {
+  const sh = sheet_(DATA_SHEET);
+  const s = JSON.stringify(data);
+  const rows = [];
+  for (let i = 0; i < s.length; i += CHUNK) rows.push(['x' + s.slice(i, i + CHUNK)]); // 'x' prefix keeps cells as plain text
+  sh.clear();
+  if (rows.length) sh.getRange(1, 1, rows.length, 1).setValues(rows);
+}
+
+function writeView_(rows) {
+  const sh = sheet_(VIEW_SHEET);
+  sh.clear();
+  if (!rows.length) return;
+  const w = Math.max.apply(null, rows.map(r => r.length));
+  const data = rows.map(r => { const x = r.slice(); while (x.length < w) x.push(''); return x; });
+  sh.getRange(1, 1, data.length, w).setValues(data);
+  sh.getRange(1, 1, 1, w).setFontWeight('bold').setBackground('#0e2733').setFontColor('#ffffff');
+  sh.setFrozenRows(1);
+}
+
+${mergeState.toString()}
+
+function out_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+`;
+
+/* =====================================================================
+   SETTINGS
+   ===================================================================== */
+function renderSet(){
+  const gs=[...S.grades].sort((a,b)=>b.min-a.min);
+  $('v-set').innerHTML=`<div class="grid two">
+   <div class="card"><h3>KPI weights (must total 100%)</h3>
+     ${KPIS.map(k=>`<div class="kpibar" style="grid-template-columns:1fr 90px"><div class="n">${k.name}</div><input type="number" min="0" max="100" data-w="${k.key}" value="${S.weights[k.key]}"></div>`).join('')}
+     <div class="row" style="margin-top:10px;justify-content:space-between"><b id="sWTot"></b><div class="row"><button class="btn sm" id="sWReset">Default 40/40/20</button><button class="btn sm pri" id="sWSave">Save weights</button></div></div>
+     <h3 style="margin-top:20px">Grading scale (minimum score)</h3>
+     ${gs.map((g,i)=>`<div class="kpibar" style="grid-template-columns:1fr 90px"><div class="n">${chip(g)}</div><input type="number" min="0" max="100" step="0.01" data-g="${i}" value="${g.min}" ${i===gs.length-1?'disabled':''}></div>`).join('')}
+     <div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sm" id="sGReset">Default</button><button class="btn sm pri" id="sGSave">Save scale</button></div></div>
+   <div class="card"><h3>Deduction list (penalties)</h3>
+     <div id="sDed">${S.deductions.map(d=>`<div class="row" style="margin:6px 0"><input data-dl="${d.id}" value="${esc(d.label)}" style="flex:1;min-width:150px"><input data-dp="${d.id}" type="number" min="0" value="${d.pts}" style="width:70px"><button class="btn sm danger" data-dx="${d.id}">×</button></div>`).join('')}</div>
+     <div class="row" style="margin-top:8px"><button class="btn sm" id="sDAdd">+ Add deduction</button><button class="btn sm pri" id="sDSave">Save list</button></div>
+     <h3 style="margin-top:20px">Admin password</h3>
+     <div class="row"><input type="password" id="sP1" placeholder="New password" style="flex:1;min-width:120px"><input type="password" id="sP2" placeholder="Confirm" style="flex:1;min-width:120px"><button class="btn sm pri" id="sPSave">Change</button></div>
+     <p class="muted" style="font-size:11.5px">Viewer mode (for TS) can see the dashboard, scorecards and roll-ups, and acknowledge/dispute grades. Only Admin can encode, import and change settings.</p></div></div>
+  <div class="grid two mt">
+   <div class="card"><h3>Trade Supervisors</h3>
+     <div class="row" style="margin-bottom:10px"><input id="sTsName" placeholder="Trade Supervisor name" style="flex:1;min-width:150px"><input id="sTsRegion" placeholder="Region" list="regList" style="width:140px"><datalist id="regList">${regions().map(r=>`<option value="${esc(r)}">`).join('')}</datalist><button class="btn sm pri" id="sTsAdd">Add</button></div>
+     <div class="row" style="margin-bottom:10px"><label class="btn sm">Import TS list CSV (REGION, TRADE SUPERVISOR)<input type="file" id="sTsImp" accept=".csv" hidden></label></div>
+     <div class="tbl-wrap" style="max-height:360px;overflow:auto"><table><thead><tr><th>Region</th><th>Trade Supervisor</th><th class="num">Months graded</th><th></th></tr></thead><tbody>
+     ${[...S.ts].sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name)).map(t=>`<tr><td>${esc(t.region)}</td><td>${esc(t.name)}${(t.aliases||[]).length?`<div class="muted" style="font-size:11px">also: ${t.aliases.map(esc).join(', ')}</div>`:''}</td><td class="num">${Object.keys(S.records).filter(k=>k.endsWith('|'+t.id)).length}</td><td style="white-space:nowrap"><button class="btn sm" data-merge="${t.id}" title="Same person with a different spelling? Merge into another TS">Merge</button> <button class="btn sm danger" data-del="${t.id}">Delete</button></td></tr>`).join('')}</tbody></table></div></div>
+   <div class="card"><h3>Data</h3>
+     <div class="row"><button class="btn sm" id="sExpAll">Export all grades (CSV)</button><button class="btn sm" id="sBackup">Backup (JSON)</button><label class="btn sm">Restore (JSON)<input type="file" id="sRestore" accept=".json" hidden></label><button class="btn sm danger" id="sReset">Clear all TS &amp; grades</button></div>
+     <p class="muted" style="font-size:12px;margin-top:12px">${sheetUrl?'Connected to Google Sheets — changes sync to all devices.':'Offline mode: data is saved in this browser only. Connect Google Sheets in <b>Import &amp; Sync</b> for cross-device sync.'}</p>
+     <h3 style="margin-top:18px">How the score is computed</h3>
+     <div style="font-size:12.5px">${KPIS.map((k,i)=>`<p style="margin:6px 0"><b>${i+1}. ${k.name} (${S.weights[k.key]}%)</b> — ${k.formula}</p>`).join('')}
+     <p class="muted" style="margin-top:8px">Final = Σ(score × weight) − deductions. If a KPI has no data for the month, its weight is redistributed over the KPIs that do. The watchlist flags TS declining 3 months in a row, below 80% for 2 consecutive months, rated Poor, or with a disputed grade.</p></div></div></div>`;
+  const upd=()=>{const t=[...document.querySelectorAll('[data-w]')].reduce((a,i)=>a+n(i.value),0);$('sWTot').textContent='Total: '+t+'%';$('sWTot').style.color=t===100?'var(--good)':'var(--bad)'};
+  document.querySelectorAll('[data-w]').forEach(i=>i.oninput=upd);upd();
+  $('sWSave').onclick=()=>{const w={};document.querySelectorAll('[data-w]').forEach(i=>w[i.dataset.w]=n(i.value));if(Object.values(w).reduce((a,b)=>a+b,0)!==100)return toast('Weights must total 100%');S.weights=w;save();toast('Weights saved');renderSet()};
+  $('sWReset').onclick=()=>{S.weights={...DEFAULT_WEIGHTS};save();renderSet();toast('Default weights restored')};
+  $('sGSave').onclick=()=>{const g2=gs.map(g=>({...g}));document.querySelectorAll('[data-g]').forEach(i=>g2[+i.dataset.g].min=n(i.value));
+    for(let i=1;i<g2.length;i++)if(g2[i].min>=g2[i-1].min)return toast('Each grade needs a lower minimum than the one above');S.grades=g2;save();toast('Grading scale saved');renderSet()};
+  $('sGReset').onclick=()=>{S.grades=DEFAULT_GRADES.map(g=>({...g}));save();renderSet();toast('Default scale restored')};
+  const readDed=()=>S.deductions.map(d=>({id:d.id,label:(document.querySelector(`[data-dl="${d.id}"]`)?.value??d.label).trim(),pts:n(document.querySelector(`[data-dp="${d.id}"]`)?.value??d.pts)}));
+  $('sDAdd').onclick=()=>{S.deductions=readDed();S.deductions.push({id:uid('d'),label:'New deduction',pts:1});renderSet()};
+  $('sDSave').onclick=()=>{S.deductions=readDed().filter(d=>d.label);save();toast('Deduction list saved');renderSet()};
+  document.querySelectorAll('[data-dx]').forEach(b=>b.onclick=()=>{S.deductions=readDed().filter(d=>d.id!==b.dataset.dx);renderSet();toast('Removed — click Save list to keep')});
+  $('sPSave').onclick=()=>{const a=$('sP1').value,b=$('sP2').value;if(a.length<4)return toast('At least 4 characters');if(a!==b)return toast('Passwords do not match');S.adminPass=a;save();$('sP1').value=$('sP2').value='';toast('Admin password changed')};
+  $('sTsAdd').onclick=()=>{const name=$('sTsName').value.trim(),region=$('sTsRegion').value.trim();if(!name||!region)return toast('Enter name and region');
+    if(findTs(name))return toast('TS already exists');S.ts.push({id:uid(),name,region});save();fillRegions();renderSet();toast('Trade Supervisor added')};
+  document.querySelectorAll('[data-merge]').forEach(b=>b.onclick=()=>{const src=S.ts.find(x=>x.id===b.dataset.merge);
+    modal(`<h3 style="margin-top:0">Merge “${esc(src.name)}”</h3><p class="muted" style="font-size:12.5px">Use when the same Trade Supervisor appears twice with different spellings. Grades move to the TS you pick, and this spelling is remembered so future pulls match automatically.</p>
+      <select id="mTo" style="width:100%">${[...S.ts].filter(x=>x.id!==src.id).sort((a,c)=>a.name.localeCompare(c.name)).map(x=>`<option value="${x.id}">${esc(x.name)} — ${esc(x.region)}</option>`).join('')}</select>
+      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn sm" onclick="closeModal()">Cancel</button><button class="btn sm pri" id="mOk">Merge</button></div>`);
+    $('mOk').onclick=()=>{const to=S.ts.find(x=>x.id===$('mTo').value);if(!to)return;let moved=0;
+      Object.keys(S.records).forEach(k=>{const [m,id]=k.split('|');if(id!==src.id)return;const kt=m+'|'+to.id;if(!S.records[kt]){S.records[kt]=S.records[k];moved++}delete S.records[k]});
+      to.aliases=[...new Set([...(to.aliases||[]),src.name,...(src.aliases||[])])];if((!to.region||to.region==='Unassigned')&&src.region)to.region=src.region;
+      S.ts=S.ts.filter(x=>x.id!==src.id);closeModal();save();fillRegions();renderSet();toast(`Merged into ${to.name} (${moved} month(s) moved)`)}});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const t=S.ts.find(x=>x.id===b.dataset.del);modalConfirm(`Delete ${t.name} and all their grades?`,()=>{
+    S.ts=S.ts.filter(x=>x.id!==t.id);Object.keys(S.records).forEach(k=>{if(k.endsWith('|'+t.id))delete S.records[k]});save();fillRegions();renderSet();toast('Deleted')})});
+  $('sTsImp').onchange=async e=>{const f=e.target.files[0];if(!f)return;const rows=parseCsv(await f.text());e.target.value='';const h=rows[0].map(normH);
+    const ri=h.findIndex(x=>x.includes('REGION')),ti=h.findIndex(x=>x.includes('SUPERVISOR')||x==='TS');if(ri<0||ti<0)return toast('CSV needs REGION and TRADE SUPERVISOR columns');
+    let add=0;rows.slice(1).forEach(r=>{const name=(r[ti]||'').trim(),region=(r[ri]||'').trim();if(name&&region&&!findTs(name)){S.ts.push({id:uid(),name,region});add++}});
+    save();fillRegions();renderSet();toast(add+' Trade Supervisor(s) imported')};
+  $('sExpAll').onclick=()=>exportCsv();
+  $('sBackup').onclick=()=>download('TS_POSM_KPI_backup_'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(S,null,1),'application/json');
+  $('sRestore').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const x=JSON.parse(await f.text());if(!x.ts||!x.records)throw 0;S=normalizeState(x);save();fillRegions();render();toast('Backup restored')}catch(_){toast('Invalid backup file')}};
+  $('sReset').onclick=()=>modalConfirm('Delete ALL Trade Supervisors and grades? Settings and connected tools are kept. Download a Backup first if unsure.',()=>{S.ts=[];S.records={};save();fillRegions();render();toast('All TS & grades cleared')});
+}
+function exportCsv(filterMonth){const rows=flatRows();const out=[rows[0],...rows.slice(1).filter(r=>!filterMonth||r[0]===filterMonth)];download(`TS_POSM_KPI_${filterMonth||'ALL'}.csv`,toCsv(out),'text/csv')}
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+applyRole();
+(async()=>{if(sheetUrl)await pullRemote(false);if(!isAdmin())return;const src=S.sources;
+  if(src.inventoryUrl)await syncTsFromInventory(false);
+  if(src.deploymentUrl&&src.depAutoPull&&month()===thisMonth())await pullDeployments(month(),false);
+  if(src.inventoryUrl&&src.autoPull)await pullInventory(month(),false);render()})();
+</script>
+</body>
+</html>
