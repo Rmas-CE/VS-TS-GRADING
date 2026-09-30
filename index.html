@@ -125,17 +125,13 @@ ol.steps li{margin:4px 0}
   <div class="hwrap">
     <div class="brand">
       <div class="logo">KPI</div>
-      <div><h1>TS POSM KPI Grading</h1><small>RMAS VISTA · KPI Scorecard</small></div>
+      <div><h1>TS POSM KPI Grading</h1><small>RMAS VISTA · Live KPI Scorecard</small></div>
     </div>
     <div class="controls">
-      <label for="gStart">From</label>
-      <input type="date" id="gStart">
-      <label for="gEnd">To</label>
-      <input type="date" id="gEnd">
-      <select id="gSaved" title="Jump to a date range that already has grades"></select>
       <label for="gRegion">Region</label>
       <select id="gRegion"></select>
       <span class="sync" id="syncStat">Offline</span>
+      <button class="btn sm hidden" id="refreshBtn" title="Pull the latest data from the Deployment KPI Tool and Inventory Tool">Refresh data</button>
       <button class="btn sm" id="roleBtn"></button>
     </div>
   </div>
@@ -143,7 +139,6 @@ ol.steps li{margin:4px 0}
     <button data-v="dash" class="active">Dashboard</button>
     <button data-v="enc" data-admin="1">Encode Grades</button>
     <button data-v="card">TS Scorecard</button>
-    <button data-v="roll">Quarterly / Yearly</button>
     <button data-v="imp" data-admin="1">Import &amp; Sync</button>
     <button data-v="set" data-admin="1">Settings</button>
   </nav>
@@ -153,7 +148,6 @@ ol.steps li{margin:4px 0}
   <section id="v-dash"></section>
   <section id="v-enc" class="hidden"></section>
   <section id="v-card" class="hidden"></section>
-  <section id="v-roll" class="hidden"></section>
   <section id="v-imp" class="hidden"></section>
   <section id="v-set" class="hidden"></section>
 </main>
@@ -191,7 +185,7 @@ const DEFAULT_DEDUCTIONS=[
 const FLAT={
   req:[['reqDeployed','Delivered request POSM actually deployed (qty) — only if partially deployed']],
   audit:[['auditStores','Stores audited (random audit)'],['auditVerified','Stores with verified actual display']],
-  rep:[['repDue','Reports due in the period'],['repOnTime','Submitted on time'],['repAccurate','Accurate (no corrections needed)'],['reported','Deployments reported with photo proof']],
+  rep:[['repDue','Reports due'],['repOnTime','Submitted on time'],['repAccurate','Accurate (no corrections needed)'],['reported','Deployments reported with photo proof']],
   com:[['comSent','RMAS instructions / concerns sent'],['comResp','Acknowledged / responded within SLA'],['meetReq','Meetings / huddles required'],['meetAtt','Meetings / huddles attended']]
 };
 const FLAT_KEYS=Object.values(FLAT).flat().map(f=>f[0]);
@@ -228,7 +222,7 @@ function isFullMonth(p){const s=pStart(p),e=pEnd(p);return s.slice(8)==='01'&&s.
 function periodHasToday(p){const t=todayYmd();return pStart(p)<=t&&t<=pEnd(p)}
 function inPeriod(d,p){return !!d&&pStart(p)<=d&&d<=pEnd(p)}
 // Long label: "September 2026" (whole month) · "Sep 5, 2026" · "Sep 5 – Oct 4, 2026" · "Dec 15, 2025 – Jan 14, 2026"
-function monthLabel(p){p=String(p||'');if(/^\d{4}-\d{2}$/.test(p))p=monthToPeriod(p);if(!p.includes('-'))return p;
+function monthLabel(p){p=String(p||'');if(p===LIVE)return 'Live data';if(/^\d{4}-\d{2}$/.test(p))p=monthToPeriod(p);if(!p.includes('-'))return p;
   const s=pDate(pStart(p)),e=pDate(pEnd(p));
   if(isFullMonth(p))return s.toLocaleString('en',{month:'long',year:'numeric'});
   const md=d=>d.toLocaleString('en',{month:'short',day:'numeric'}),full=d=>d.toLocaleString('en',{month:'short',day:'numeric',year:'numeric'});
@@ -244,6 +238,10 @@ function dateOf(v){if(v===undefined||v===null||v==='')return '';if(v instanceof 
   const d=new Date(s);return isNaN(d)?'':ymd(d)}
 function periodKeys(){return [...new Set(Object.keys(S.records).map(k=>k.split('|')[0]))].sort()}
 function prevPeriod(p){return periodKeys().filter(x=>x<p).pop()||null}
+/* ---- Continuous (live) grading ----
+   No month / date range: every TS has ONE live grade (key "LIVE|<tsId>") that is refreshed
+   whenever data changes in the Deployment KPI Tool and Inventory Tool. */
+const LIVE='LIVE';
 function download(name,text,type){const b=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
 function toCsv(lines){return lines.map(l=>l.map(csvCell).join(',')).join('\n')}
@@ -266,7 +264,7 @@ function agg(r){const o={required:0,complete:0,fullDep:0,delivered:0,anyBU:false
   o.deployed=o.complete+o.fullDep;o.incomplete=Math.max(0,o.required-o.deployed);return o}
 const buDone=x=>n(x.complete)+n(x.fullDep);
 // Request deployment (Inventory Tool requests + RMAS verification):
-//  verified  → 100% (all delivered request POSM deployed, or no request in the period)
+//  verified  → 100% (all delivered request POSM deployed, or no request)
 //  partial   → deployed qty ÷ delivered qty
 //  not yet verified → not counted (pending)
 function reqScore(r,a){a=a||agg(r);if(r.reqVerify==='verified')return 1;if(r.reqVerify==='partial')return a.delivered>0?clamp(n(r.reqDeployed)/a.delivered):null;return null}
@@ -275,7 +273,7 @@ function buRate(r,b){const x=(r.bu||{})[b]||{};return n(x.required)>0?clamp(Math
 
 const KPIS=[
  {key:'dep',name:'POSM Deployment Execution',short:'Deployment',
-  desc:'Deployment status per BU from the Deployment KPI Tool (Incomplete – Full Deployment = no available stock, counted as complete), plus deployment of the POSM the TS requested and received from the Inventory Tool, verified by RMAS. No request within the date range = 100% once RMAS verifies.',
+  desc:'Deployment status per BU from the Deployment KPI Tool (Incomplete – Full Deployment = no available stock, counted as complete), plus deployment of the POSM the TS requested and received from the Inventory Tool, verified by RMAS. No request = 100% once RMAS verifies.',
   formula:'Average of: ((Complete + Incomplete Full Dep.) × Audit verification rate) ÷ Target, and Request deployment (RMAS-verified: 100%, or deployed qty ÷ delivered qty)',
   calc:(r,a)=>{const p=[];if(a.required>0)p.push(clamp(Math.min(a.deployed,a.required)*verRate(r)/a.required));const q=reqScore(r,a);if(q!=null)p.push(q);return avg(p)},
   check:(r,a)=>{const e=[];BUS.forEach(b=>{const x=(r.bu||{})[b]||{};if(buDone(x)>n(x.required)&&has(x.required))e.push(`${b}: Complete + Incomplete Full Dep. cannot exceed Target.`)});
@@ -313,6 +311,9 @@ function normalizeState(o){o.weights=o.weights||{...DEFAULT_WEIGHTS};o.grades=o.
   Object.keys(o.records).forEach(k=>{const i=k.indexOf('|'),m=k.slice(0,i),id=k.slice(i+1);if(!/^\d{4}-\d{2}$/.test(m))return;
     const nk=monthToPeriod(m)+'|'+id,r=o.records[k];if(!o.records[nk]||String(r.updated||'')>String(o.records[nk].updated||''))o.records[nk]=r;
     delete o.records[k];if(String(o.deleted[k]||'')<now)o.deleted[k]=now});
+  // Start the live grade from each TS's latest saved grade (keeps manual inputs like reports / communication / RMAS verification)
+  const latest={};Object.keys(o.records).forEach(k=>{const i=k.indexOf('|'),pk=k.slice(0,i),id=k.slice(i+1);if(pk===LIVE)return;if(!latest[id]||pk>latest[id])latest[id]=pk});
+  Object.entries(latest).forEach(([id,pk])=>{const lk=LIVE+'|'+id;if(o.records[lk]||o.deleted[lk])return;o.records[lk]=JSON.parse(JSON.stringify(o.records[pk+'|'+id]))});
   return o}
 /* ---- change stamping: every edit gets a timestamp so multi-device merges keep the newest version ---- */
 const SETTING_KEYS=['weights','grades','deductions','adminPass','sources','buMap'];
@@ -358,7 +359,7 @@ function compute(r){
   const flags=[];
   if(a.required>0&&a.incomplete>0)flags.push(['',`${a.incomplete} of ${a.required} deployment(s) still Incomplete — not credited.`]);
   if(a.fullDep>0)flags.push(['blue',`${a.fullDep} deployment(s) marked Incomplete – Full Deployment (no available POSM stock) — counted as complete.`]);
-  if(!r.reqVerify)flags.push(['blue',a.delivered>0?`Request deployment pending RMAS verification (${a.delivered} request POSM delivered in this period).`:'No request in this period — becomes 100% once RMAS verifies deployment is complete.']);
+  if(!r.reqVerify)flags.push(['blue',a.delivered>0?`Request deployment pending RMAS verification (${a.delivered} request POSM delivered).`:'No request POSM delivered — becomes 100% once RMAS verifies deployment is complete.']);
   if(r.reqVerify==='partial'&&a.delivered>n(r.reqDeployed))flags.push(['',`${a.delivered-n(r.reqDeployed)} of ${a.delivered} delivered request POSM not deployed.`]);
   if(n(r.auditStores)>0&&n(r.auditVerified)<n(r.auditStores))flags.push(['red',`Audit: only ${n(r.auditVerified)} of ${n(r.auditStores)} audited stores had actual display — deployment credit reduced to ${pct(verRate(r))}.`]);
   if(has(r.reported)&&a.deployed>n(r.reported))flags.push(['',`${a.deployed-n(r.reported)} deployments not reported with photo proof.`]);
@@ -377,9 +378,8 @@ function history(id,upto){return Object.keys(S.records).filter(k=>k.endsWith('|'
 function watch(id,m){const h=history(id,m);const out=[];if(!h.length||h[h.length-1].m!==m)return out;const L=h.length;
   // Only judge complete grades: a TS still missing Reporting/Communication (not yet encoded) is not put on the watchlist
   if(h[L-1].c.lines.some(l=>l.s==null)){if(h[L-1].r.ack?.status==='disputed')out.push('Grade disputed by TS');return out}
-  if(L>=3&&h[L-3].c.final>h[L-2].c.final&&h[L-2].c.final>h[L-1].c.final)out.push(`Declining 3 periods (${h[L-3].c.final.toFixed(1)} → ${h[L-2].c.final.toFixed(1)} → ${h[L-1].c.final.toFixed(1)})`);
-  if(L>=2&&h[L-1].c.final<80&&h[L-2].c.final<80)out.push('Below 80% for 2 consecutive periods');
-  else if(h[L-1].c.final<75)out.push('Poor rating this period');
+  if(h[L-1].c.final<75)out.push('Poor rating ('+h[L-1].c.final.toFixed(1)+'%)');
+  else if(h[L-1].c.final<80)out.push('Below 80% ('+h[L-1].c.final.toFixed(1)+'%)');
   if(h[L-1].r.ack?.status==='disputed')out.push('Grade disputed by TS');
   return out}
 function monthRank(m){return filteredTs().map(t=>({t,r:recOf(m,t.id)})).filter(x=>x.r).map(x=>({...x,c:compute(x.r)})).filter(x=>x.c.final!=null).sort((a,b)=>b.c.final-a.c.final)}
@@ -395,21 +395,16 @@ function findTs(name){const k=nameKey(name);if(!k)return null;return S.ts.find(t
 function ensureTs(name,region){let t=findTs(name);if(t){if((!t.region||t.region==='Unassigned')&&region)t.region=region;return {t,added:false}}
   t={id:uid(),name:String(name).trim(),region:String(region||'').trim()||'Unassigned'};S.ts.push(t);return {t,added:true}}
 function filteredTs(){const r=$('gRegion').value;return S.ts.filter(t=>!r||t.region===r).sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name))}
-const PERIOD_KEY='rmas_kpi_period';
-function period(){let s=$('gStart').value,e=$('gEnd').value;if(!s&&!e){const t=todayYmd();s=t.slice(0,8)+'01';e=t}if(!s)s=e;if(!e)e=s;if(e<s)[s,e]=[e,s];return s+'~'+e}
-const month=period; // the whole tool works on the selected date range
-function setPeriod(p){$('gStart').value=pStart(p);$('gEnd').value=pEnd(p);lsSet(PERIOD_KEY,p)}
-function fillPeriods(){const cur=period(),keys=periodKeys().reverse();
-  $('gSaved').innerHTML=`<option value="">${keys.length?'Saved ranges ('+keys.length+')':'No saved ranges yet'}</option>`+keys.map(k=>`<option value="${k}" ${k===cur?'selected':''}>${esc(monthLabel(k))}</option>`).join('')}
-(()=>{const last=lsGet(PERIOD_KEY),keys=Object.keys(S.records).map(k=>k.split('|')[0]).filter(k=>k.includes('~')).sort();const t=todayYmd();
-  setPeriod(last&&/^\d{4}-\d{2}-\d{2}~\d{4}-\d{2}-\d{2}$/.test(last)?last:keys.length?keys[keys.length-1]:t.slice(0,8)+'01~'+t)})();
+const month=()=>LIVE; // continuous: one live grade per TS
+function lastPullText(){const t=[S.sources.depLastPull,S.sources.lastPull].filter(x=>x&&x.at).map(x=>x.at).sort().pop();
+  return t?'Data as of '+new Date(t).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'}):'Live data — not pulled yet'}
 function fillRegions(){const cur=$('gRegion').value;$('gRegion').innerHTML='<option value="">All regions</option>'+regions().map(r=>`<option ${r===cur?'selected':''}>${esc(r)}</option>`).join('')}
 fillRegions();
 let view='dash',selTs=null;
 function isAdmin(){return role==='admin'}
 function applyRole(){
   $('roleBtn').textContent=isAdmin()?'Admin · Log out':'Viewer · Admin login';
-  $('nav').querySelectorAll('[data-admin]').forEach(b=>b.classList.toggle('hidden',!isAdmin()));
+  $('nav').querySelectorAll('[data-admin]').forEach(b=>b.classList.toggle('hidden',!isAdmin()));$('refreshBtn').classList.toggle('hidden',!isAdmin());
   if(!isAdmin()&&['enc','imp','set'].includes(view))go('dash');else render();
 }
 $('roleBtn').onclick=()=>{if(isAdmin()){role='viewer';lsSet(ROLE_KEY,role);applyRole();toast('Logged out — viewer mode');return}
@@ -420,13 +415,10 @@ $('roleBtn').onclick=()=>{if(isAdmin()){role='viewer';lsSet(ROLE_KEY,role);apply
 function modal(html){$('modalHost').innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="box">${html}</div></div>`}
 function closeModal(){$('modalHost').innerHTML=''}
 function go(v){view=v;[...$('nav').children].forEach(x=>x.classList.toggle('active',x.dataset.v===v));
-  ['dash','enc','card','roll','imp','set'].forEach(x=>$('v-'+x).classList.toggle('hidden',x!==v));render();window.scrollTo(0,0)}
+  ['dash','enc','card','imp','set'].forEach(x=>$('v-'+x).classList.toggle('hidden',x!==v));render();window.scrollTo(0,0)}
 $('nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.v)};
-function onPeriodChange(){const s=$('gStart').value,e=$('gEnd').value;if(s&&e&&e<s){$('gStart').value=e;$('gEnd').value=s;toast('Start and end swapped')}
-  if(!$('gStart').value&&$('gEnd').value)$('gStart').value=$('gEnd').value;if(!$('gEnd').value&&$('gStart').value)$('gEnd').value=$('gStart').value;lsSet(PERIOD_KEY,period());render()}
-$('gStart').onchange=onPeriodChange;$('gEnd').onchange=onPeriodChange;
-$('gSaved').onchange=e=>{if(!e.target.value)return;setPeriod(e.target.value);render()};$('gRegion').onchange=render;
-function render(){fillPeriods();({dash:renderDash,enc:renderEnc,card:renderCard,roll:renderRoll,imp:renderImp,set:renderSet})[view]()}
+$('gRegion').onchange=render;
+function render(){({dash:renderDash,enc:renderEnc,card:renderCard,imp:renderImp,set:renderSet})[view]()}
 function tsOptions(){const list=filteredTs();if(!selTs||!list.some(t=>t.id===selTs))selTs=list[0]?.id||null;
   return list.map(t=>`<option value="${t.id}" ${t.id===selTs?'selected':''}>${esc(t.name)} — ${esc(t.region)}</option>`).join('')}
 function openTs(id,v){selTs=id;go(v)}
@@ -442,7 +434,7 @@ function renderDash(){
   const ranked=[...graded].sort((a,b)=>b.c.final-a.c.final);
   const ackN=graded.filter(x=>x.r.ack?.status==='acknowledged').length, disN=graded.filter(x=>x.r.ack?.status==='disputed').length;
   const wl=list.map(t=>({t,w:watch(t.id,m)})).filter(x=>x.w.length);
-  const pp=prevPeriod(m);const prevAvg=pp==null?null:avg(list.map(t=>recOf(pp,t.id)).filter(Boolean).map(r=>compute(r).final).filter(x=>x!=null));
+  
   const sumA=f=>graded.reduce((s,x)=>s+x.c.a[f],0);
   const regs=[...new Set(graded.map(x=>x.t.region))].map(r=>({r,v:avg(graded.filter(x=>x.t.region===r).map(x=>x.c.final)),c:graded.filter(x=>x.t.region===r).length})).sort((a,b)=>b.v-a.v);
   const buStats=BUS.map(b=>{let req=0,dep=0;graded.forEach(x=>{const y=(x.r.bu||{})[b]||{};req+=n(y.required);dep+=Math.min(buDone(y),n(y.required))});return {b,req,dep,rate:req?dep/req:null}});
@@ -457,8 +449,8 @@ function renderDash(){
     <p style="margin:0 0 10px">No Trade Supervisors yet. ${isAdmin()?'Load them from your Inventory Tool (same master list) or add / import them in Settings.':'Ask the RMAS Admin to set up the Trade Supervisor list.'}</p>
     ${isAdmin()?`<div class="row"><button class="btn pri" onclick="go('imp')">Sync from Inventory Tool</button><button class="btn sm" onclick="go('set')">Add / import in Settings</button></div>`:''}</div>`:''}
   <div class="grid cards">
-   <div class="card stat"><h3>TS graded</h3><div class="v">${graded.length}<span class="muted" style="font-size:16px"> / ${list.length}</span></div><div class="s">${monthLabel(m)}</div></div>
-   <div class="card stat"><h3>Average POSM KPI</h3><div class="v">${av==null?'—':av.toFixed(2)+'%'}</div><div class="s">${av==null?'No grades yet':chip(gradeOf(av))} ${prevAvg!=null&&av!=null?`<span style="color:${av>=prevAvg?'var(--good)':'var(--bad)'}">${av>=prevAvg?'▲':'▼'} ${Math.abs(av-prevAvg).toFixed(2)} vs ${esc(monthLabel(pp))}</span>`:''}</div></div>
+   <div class="card stat"><h3>TS graded</h3><div class="v">${graded.length}<span class="muted" style="font-size:16px"> / ${list.length}</span></div><div class="s">${lastPullText()}</div></div>
+   <div class="card stat"><h3>Average POSM KPI</h3><div class="v">${av==null?'—':av.toFixed(2)+'%'}</div><div class="s">${av==null?'No grades yet':chip(gradeOf(av))}</div></div>
    <div class="card stat"><h3>Acknowledgment</h3><div class="v">${ackN}<span class="muted" style="font-size:16px"> / ${graded.length}</span></div><div class="s">${disN?`<span class="tag dis">${disN} disputed</span> `:''}${graded.length-ackN-disN?`<span class="tag pen">${graded.length-ackN-disN} pending</span>`:''}</div></div>
    <div class="card stat"><h3>Watchlist</h3><div class="v" style="color:${wl.length?'var(--warn)':'var(--good)'}">${wl.length}</div><div class="s">TS needing coaching / follow-up</div></div>
   </div>
@@ -482,10 +474,10 @@ function renderDash(){
   <div class="card mt"><h3>Watchlist — needs coaching</h3>
     ${(()=>{const pc=graded.filter(x=>x.c.lines.some(l=>l.s==null)).length;return pc?`<p class="muted" style="font-size:12px;margin:0 0 8px">${pc} TS not judged yet — their grade is still partial (e.g. Reporting / Communication not encoded). They join the watchlist check once all KPIs have data.</p>`:''})()}
     ${wl.length?`<div class="tbl-wrap"><table><thead><tr><th>Trade Supervisor</th><th>Region</th><th>Reason</th><th class="num">Score</th><th></th></tr></thead><tbody>${wl.map(x=>{const r=recOf(m,x.t.id);const c=r?compute(r):null;
-      return `<tr><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.region)}</td><td style="white-space:normal">${x.w.map(w=>`<span class="tag pen" style="margin:2px">${esc(w)}</span>`).join('')}</td><td class="num">${c?fx(c.final):'—'}</td><td><button class="btn sm" onclick="openTs('${x.t.id}','card')">Open scorecard</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="flag green">No TS on the watchlist for this period.</div>'}
+      return `<tr><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.region)}</td><td style="white-space:normal">${x.w.map(w=>`<span class="tag pen" style="margin:2px">${esc(w)}</span>`).join('')}</td><td class="num">${c?fx(c.final):'—'}</td><td><button class="btn sm" onclick="openTs('${x.t.id}','card')">Open scorecard</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="flag green">No TS on the watchlist.</div>'}
   </div>
   <div class="card mt">
-    <div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">TS ranking — ${monthLabel(m)}</h3>
+    <div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">TS ranking — live</h3>
       <div class="row noprint"><button class="btn sm" id="expMonth">Export CSV</button></div></div>
     <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Trade Supervisor</th><th>Region</th>${KPIS.map(k=>`<th class="num">${k.short}<br><span style="font-weight:400">${S.weights[k.key]}%</span></th>`).join('')}<th class="num">Deduct.</th><th class="num">Final</th><th>Grade</th><th>Status</th><th class="noprint"></th></tr></thead><tbody>
     ${list.length?[...ranked,...rows.filter(x=>!(x.c&&x.c.final!=null))].map((x,i)=>{const g=x.c&&x.c.final!=null;
@@ -505,8 +497,8 @@ function renderEnc(){
   const m=month();
   $('v-enc').innerHTML=`<div class="card" style="margin-bottom:14px"><div class="row">
     <label class="muted" for="eTs">Trade Supervisor</label><select id="eTs" style="min-width:230px">${tsOptions()}</select>
-    <span class="muted">${monthLabel(m)}</span><span id="eStatus"></span>
-    <div class="row" style="margin-left:auto">${S.sources.inventoryUrl||S.sources.deploymentUrl?'<button class="btn sm" id="ePull">Pull from RMAS tools</button>':''}<button class="btn sm" id="eCopyPrev">Copy previous period's targets</button><button class="btn sm danger" id="eClear">Delete grade</button></div></div></div>
+    <span class="muted">${lastPullText()}</span><span id="eStatus"></span>
+    <div class="row" style="margin-left:auto">${S.sources.inventoryUrl||S.sources.deploymentUrl?'<button class="btn sm" id="ePull">Pull from RMAS tools</button>':''}<button class="btn sm danger" id="eClear">Delete grade</button></div></div></div>
     <div class="grid enc"><div id="eForm"></div>
       <div class="card sticky"><h3>Live computation</h3><div class="calc" id="eCalc"></div>
         <div class="final"><div class="v" id="eFinal">—</div><div id="eGrade"></div></div><div id="eFlags"></div>
@@ -528,9 +520,9 @@ function renderEnc(){
     <div class="tbl-wrap"><table class="butbl"><thead><tr><th>BU</th>${BU_FIELDS.map(f=>`<th class="num" style="white-space:normal;min-width:84px">${f[1]}</th>`).join('')}<th class="num">Incomplete</th><th class="num">Rate</th></tr></thead><tbody>
     ${BUS.map(b=>`<tr><td><b>${b}</b></td>${BU_FIELDS.map(([f])=>`<td>${inp(`bu.${b}.${f}`)}</td>`).join('')}<td class="num" id="inc_${b}" style="color:#fca5a5">—</td><td class="num" id="bur_${b}">—</td></tr>`).join('')}
     <tr><td class="muted">Total</td>${BU_FIELDS.map(([f])=>`<td class="num" id="tot_${f}">0</td>`).join('')}<td class="num" id="inc_T" style="color:#fca5a5">0</td><td class="num" id="bur_T">—</td></tr></tbody></table></div>
-    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Target = stores / deployments assigned in this date range. <b>Incomplete</b> is computed (Target − Complete − Incomplete Full Dep.). <b>Incomplete – Full Deployment</b> = deployed everything that was available; the rest had no POSM stock, so it counts as complete. Request POSM delivered comes from the Inventory Tool (requests delivered within the date range).</p>
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Target = stores / deployments assigned (current status from the Deployment KPI Tool). <b>Incomplete</b> is computed (Target − Complete − Incomplete Full Dep.). <b>Incomplete – Full Deployment</b> = deployed everything that was available; the rest had no POSM stock, so it counts as complete. Request POSM delivered comes from the Inventory Tool (all requests marked Delivered).</p>
     <div style="margin-top:12px;border:1px dashed var(--line);border-radius:10px;padding:10px">
-      <div style="font-size:12.5px;margin-bottom:8px"><b>Request deployment — RMAS verification</b> <span class="muted">· Request POSM delivered in this period (Inventory Tool): <b id="reqDel">0</b></span></div>
+      <div style="font-size:12.5px;margin-bottom:8px"><b>Request deployment — RMAS verification</b> <span class="muted">· Request POSM delivered (Inventory Tool): <b id="reqDel">0</b></span></div>
       <div class="row" style="gap:14px;font-size:13px">
         <label class="row" style="gap:6px"><input type="radio" name="reqV" value="" ${!draft.reqVerify?'checked':''}> Not yet verified</label>
         <label class="row" style="gap:6px"><input type="radio" name="reqV" value="verified" ${draft.reqVerify==='verified'?'checked':''}> Verified complete <span class="muted">(all delivered POSM deployed, or no request) = 100%</span></label>
@@ -554,10 +546,7 @@ function renderEnc(){
     $('customDed').insertAdjacentHTML('beforeend',`<div class="row" style="margin:6px 0;font-size:13px"><span>${esc(l)}</span><span class="tag dis">−${p}</span><button class="btn sm danger" data-rmc="${esc(l)}">Remove</button></div>`);bindRm();$('cdLabel').value='';$('cdPts').value='';liveCalc()};
   $('eSave').onclick=saveGrade;
   if($('ePull'))$('ePull').onclick=async()=>{if(S.sources.deploymentUrl)await pullDeployments(month(),true);if(S.sources.inventoryUrl)await pullInventory(month(),true);renderEnc()};
-  $('eClear').onclick=()=>{const k=month()+'|'+selTs;if(!S.records[k])return toast('Nothing saved yet');modalConfirm('Delete the saved grade for this TS and date range?',()=>{delete S.records[k];save();renderEnc();toast('Grade deleted')})};
-  $('eCopyPrev').onclick=()=>{const pk=Object.keys(S.records).filter(k=>k.endsWith('|'+selTs)).map(k=>k.split('|')[0]).filter(x=>x<month()).sort().pop();const p=pk?recOf(pk,selTs):null;if(!p)return toast('No earlier period saved for this TS');
-    BUS.forEach(b=>{const v=getP(p,`bu.${b}.required`);if(has(v))setP(draft,`bu.${b}.required`,v)});['repDue','meetReq'].forEach(f=>{if(has(p[f]))draft[f]=p[f]});
-    $('eForm').querySelectorAll('input[data-p]').forEach(i=>{const v=getP(draft,i.dataset.p);i.value=has(v)?v:''});liveCalc();toast('Copied from '+monthLabel(pk)+': Target per BU, Reports due & Meetings required')};
+  $('eClear').onclick=()=>{const k=month()+'|'+selTs;if(!S.records[k])return toast('Nothing saved yet');modalConfirm('Delete the saved grade for this TS? It will be rebuilt from the next data pull, but manual entries will be lost.',()=>{delete S.records[k];save();renderEnc();toast('Grade deleted')})};
   liveCalc();
 }
 function liveCalc(){
@@ -599,7 +588,7 @@ function insights(cur,prev,rank,total){
   if(n(r.auditStores)>0&&verRate(r)<1)out.push(['b','A',`Audit found ${n(r.auditStores)-n(r.auditVerified)} of ${n(r.auditStores)} store(s) without actual display, which reduced the deployment credit to ${pct(verRate(r))} of what was reported.`]);
   if(c.ded)out.push(['w','−',`Deductions of ${c.ded} pts applied. Without them the score would be ${fx(c.weighted)} (${gradeOf(c.weighted).label}).`]);
   if(prev){const d=c.final-prev.c.final;out.push([d>=0?'g':'w',d>=0?'▲':'▼',`${d>=0?'Improved':'Dropped'} ${Math.abs(d).toFixed(2)} pts vs ${monthLabel(prev.m)}.`])}
-  if(rank)out.push(['b','#',`Ranked <b>${rank}</b> of ${total} graded TS this period${$('gRegion').value?' in '+esc($('gRegion').value):''}.`]);
+  if(rank)out.push(['b','#',`Ranked <b>${rank}</b> of ${total} graded TS${$('gRegion').value?' in '+esc($('gRegion').value):''}.`]);
   const nextG=[...S.grades].sort((a,b)=>a.min-b.min).find(g=>g.min>c.final);if(nextG)out.push(['b','↑',`Needs +${(nextG.min-c.final).toFixed(2)} pts to reach <b>${nextG.label}</b>.`]);
   return out;
 }
@@ -610,28 +599,19 @@ function renderCard(){
     <div class="row" style="margin-left:auto"><button class="btn sm" id="cCopy">Copy summary (Viber / Messenger)</button><button class="btn sm" onclick="window.print()">Print / Save PDF</button></div></div></div><div id="cBody"></div>`;
   $('cTs').onchange=e=>{selTs=e.target.value;renderCard()};
   const t=S.ts.find(x=>x.id===selTs);if(!t){$('cBody').innerHTML='<div class="card empty">No Trade Supervisor selected.</div>';return}
-  const hist=history(t.id);
-  const cur=hist.find(h=>h.m===m)||[...hist].reverse().find(h=>h.m<=m);
-  if(!cur){$('cBody').innerHTML=`<div class="card empty">${esc(t.name)} has no grades up to ${monthLabel(m)}. ${isAdmin()?`<button class="btn sm" onclick="openTs('${t.id}','enc')">Grade now</button>`:''}</div>`;$('cCopy').disabled=true;return}
-  const idx=hist.indexOf(cur),prev=idx>0?hist[idx-1]:null;
+  const hist=history(t.id);const cur=hist.find(h=>h.m===m);
+  if(!cur){$('cBody').innerHTML=`<div class="card empty">${esc(t.name)} has no grade yet. ${isAdmin()?`<button class="btn sm" onclick="openTs('${t.id}','enc')">Grade now</button>`:''}</div>`;$('cCopy').disabled=true;return}
   const rk=monthRank(cur.m);const rank=rk.findIndex(x=>x.t.id===t.id)+1;
-  const delta=prev?cur.c.final-prev.c.final:null;
-  const q=Math.floor((+cur.m.slice(5,7)-1)/3),qOf=x=>x.slice(0,4)===cur.m.slice(0,4)&&Math.floor((+x.slice(5,7)-1)/3)===q;
-  const qAvg=avg(hist.filter(h=>qOf(h.m)).map(h=>h.c.final));
-  const W=1100,H=230,P=44;const lo=Math.min(60,...hist.map(h=>Math.floor(h.c.final/10)*10));
-  const xs=i=>P+(hist.length<2?(W-2*P)/2:i*(W-2*P)/(hist.length-1));const ys=v=>H-P-(v-lo)/(100-lo)*(H-2*P);
-  const path=hist.map((h,i)=>`${i?'L':'M'}${xs(i)},${ys(h.c.final)}`).join('');
   const r=cur.r,c=cur.c;const ack=r.ack;
-  const ins=insights(cur,prev,rank,rk.length);
+  const ins=insights(cur,null,rank,rk.length);
   const icol={g:'#22c55e',w:'#f59e0b',b:'#3fa9f5'};
-  const grid=[lo,...[70,80,90].filter(v=>v>lo),100];
+  const depRate=c.a.required?Math.min(c.a.deployed,c.a.required)/c.a.required:null;
   $('cBody').innerHTML=`
-  ${cur.m!==m?`<div class="flag blue" style="margin-bottom:14px">No grade for ${monthLabel(m)} — showing latest: ${monthLabel(cur.m)}.</div>`:''}
   <div class="grid cards">
     <div class="card stat"><h3>Trade Supervisor</h3><div class="v" style="font-size:20px">${esc(t.name)}</div><div class="s">${esc(t.region)} · Rank ${rank||'—'} of ${rk.length}</div></div>
-    <div class="card stat"><h3>${monthLabel(cur.m)}</h3><div class="v">${c.final.toFixed(2)}%</div><div class="s">${chip(c.grade)} ${ackTag(r)}</div></div>
-    <div class="card stat"><h3>vs previous period</h3><div class="v" style="color:${delta==null?'var(--muted)':delta>=0?'var(--good)':'var(--bad)'}">${delta==null?'—':(delta>=0?'▲ +':'▼ ')+delta.toFixed(2)}</div><div class="s">${prev?monthLabel(prev.m)+': '+prev.c.final.toFixed(2)+'%':'No previous period'}</div></div>
-    <div class="card stat"><h3>Q${q+1} ${cur.m.slice(0,4)} average</h3><div class="v">${fx(qAvg)}</div><div class="s">${qAvg!=null?chip(gradeOf(qAvg)):''}</div></div>
+    <div class="card stat"><h3>Final POSM KPI</h3><div class="v">${c.final.toFixed(2)}%</div><div class="s">${chip(c.grade)} ${ackTag(r)}</div></div>
+    <div class="card stat"><h3>Deployment rate</h3><div class="v">${pct(depRate)}</div><div class="s">${c.a.deployed} of ${c.a.required} done · ${c.a.incomplete} incomplete</div></div>
+    <div class="card stat"><h3>Last updated</h3><div class="v" style="font-size:18px">${r.updated?new Date(r.updated).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'}):'—'}</div><div class="s">${lastPullText()}</div></div>
   </div>
   <div class="grid two mt">
     <div class="card"><h3>Computation</h3><div class="tbl-wrap"><table>
@@ -662,65 +642,18 @@ function renderCard(){
       <div class="row" style="margin-top:10px"><button class="btn ok" id="ackOk">I acknowledge this grade</button><button class="btn danger" id="ackNo">Dispute</button>${isAdmin()&&ack?'<button class="btn sm" id="ackReset" style="margin-left:auto">Reset status</button>':''}</div>
       <p class="muted" style="font-size:11px;margin-bottom:0">When RMAS changes a grade after acknowledgment, the status goes back to Pending.</p></div></div>
   </div>
-  <div class="card mt"><h3>Trend per period</h3>
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Final score trend per period">
-      ${grid.map(v=>`<line x1="${P}" x2="${W-P}" y1="${ys(v)}" y2="${ys(v)}" stroke="#1d4556"/><text x="4" y="${ys(v)+4}">${v}%</text>`).join('')}
-      <path d="${path}" fill="none" stroke="#19d3c5" stroke-width="2.5"/>
-      ${hist.map((h,i)=>`<circle cx="${xs(i)}" cy="${ys(h.c.final)}" r="${h.m===cur.m?7:5}" fill="${h.c.grade.color}" stroke="#06141b" stroke-width="2"><title>${monthLabel(h.m)}: ${h.c.final.toFixed(2)}%</title></circle><text x="${xs(i)}" y="${ys(h.c.final)-12}" text-anchor="middle" style="fill:#e6f4f7;font-weight:700">${h.c.final.toFixed(1)}</text><text x="${xs(i)}" y="${H-10}" text-anchor="middle">${monthShort(h.m)}</text>`).join('')}
-    </svg>
-    <div class="tbl-wrap"><table><thead><tr><th>Period</th>${KPIS.map(k=>`<th class="num">${k.short}</th>`).join('')}<th class="num">Deduct.</th><th class="num">Final</th><th>Grade</th><th>Status</th></tr></thead><tbody>
-    ${[...hist].reverse().map(h=>`<tr><td>${monthLabel(h.m)}</td>${KPIS.map(k=>`<td class="num">${pct(h.c.scores[k.key])}</td>`).join('')}<td class="num">${h.c.ded?'−'+h.c.ded:'—'}</td><td class="num"><b>${h.c.final.toFixed(2)}%</b></td><td>${chip(h.c.grade)}</td><td>${ackTag(h.r)}</td></tr>`).join('')}
-    </tbody></table></div></div>`;
+  `;
   const setAck=(status)=>{const cm=$('ackCmt').value.trim();if(status==='disputed'&&!cm)return toast('Please write the reason for the dispute');
     S.records[cur.m+'|'+t.id].ack={status,comment:cm,at:new Date().toISOString()};save();renderCard();toast(status==='acknowledged'?'Grade acknowledged':'Dispute sent to RMAS')};
   $('ackOk').onclick=()=>setAck('acknowledged');$('ackNo').onclick=()=>setAck('disputed');
   if($('ackReset'))$('ackReset').onclick=()=>{delete S.records[cur.m+'|'+t.id].ack;save();renderCard();toast('Status reset to Pending')};
   $('cCopy').onclick=()=>{const tip=c.lines.filter(l=>l.s!=null).sort((a,b)=>a.s-b.s)[0];
-    const txt=`TS POSM KPI — ${monthLabel(cur.m)}\n${t.name} (${t.region})\n\nFinal: ${c.final.toFixed(2)}% — ${c.grade.label}\nRank: ${rank} of ${rk.length}\n\n`+
+    const txt=`TS POSM KPI — as of ${new Date().toLocaleDateString('en',{dateStyle:'medium'})}\n${t.name} (${t.region})\n\nFinal: ${c.final.toFixed(2)}% — ${c.grade.label}\nRank: ${rank} of ${rk.length}\n\n`+
       c.lines.map(l=>`• ${l.k.short} (${l.w}%): ${pct(l.s)}`).join('\n')+(c.ded?`\n• Deductions: −${c.ded} pts`:'')+
       `\n\nPer BU deployment: ${BUS.map(b=>`${b} ${pct(buRate(r,b),0)}`).join(' | ')}`+
-      (delta!=null?`\nVs previous period: ${delta>=0?'+':''}${delta.toFixed(2)} pts`:'')+(tip&&tip.s<0.95?`\nFocus: ${tip.k.name}`:'')+(r.remarks?`\nRemarks: ${r.remarks}`:'')+
+      (tip&&tip.s<0.95?`\nFocus: ${tip.k.name}`:'')+(r.remarks?`\nRemarks: ${r.remarks}`:'')+
       `\n\nPlease acknowledge in the KPI tool. Thank you!`;
     copyText(txt).then(()=>toast('Summary copied — paste in Viber / Messenger'))};
-}
-
-/* =====================================================================
-   ROLL-UP (Quarterly / Yearly)
-   ===================================================================== */
-let rollYear=null,rollPer=null;
-const PER_LABEL={H1:'1st Half',H2:'2nd Half',FY:'Full Year'};
-function renderRoll(){
-  const years=[...new Set(Object.keys(S.records).map(k=>k.slice(0,4)))].sort();
-  if(!rollYear)rollYear=month().slice(0,4);if(!years.includes(rollYear))years.push(rollYear);
-  if(!rollPer)rollPer='Q'+(Math.floor((+month().slice(5,7)-1)/3)+1);
-  const PER={Q1:[1,2,3],Q2:[4,5,6],Q3:[7,8,9],Q4:[10,11,12],H1:[1,2,3,4,5,6],H2:[7,8,9,10,11,12],FY:[1,2,3,4,5,6,7,8,9,10,11,12]};
-  // every saved date range whose START date falls inside the chosen quarter / half / year
-  const months=periodKeys().filter(p=>p.slice(0,4)===rollYear&&PER[rollPer].includes(+p.slice(5,7)));
-  const rows=filteredTs().map(t=>{const h=months.map(m=>{const r=recOf(m,t.id);const c=r?compute(r):null;return c&&c.final!=null?{m,c,r}:null});const g=h.filter(Boolean);
-    return {t,h,g,avgF:avg(g.map(x=>x.c.final)),k:Object.fromEntries(KPIS.map(k=>[k.key,avg(g.map(x=>x.c.scores[k.key]).filter(s=>s!=null))])),ded:g.reduce((s,x)=>s+x.c.ded,0),
-      trend:g.length>1?g[g.length-1].c.final-g[0].c.final:null}}).sort((a,b)=>(b.avgF??-1)-(a.avgF??-1));
-  const withG=rows.filter(x=>x.avgF!=null);
-  const regs=[...new Set(withG.map(x=>x.t.region))].map(r=>({r,v:avg(withG.filter(x=>x.t.region===r).map(x=>x.avgF))})).sort((a,b)=>b.v-a.v);
-  const overall=avg(withG.map(x=>x.avgF));
-  const mi=[...withG].filter(x=>x.trend!=null).sort((a,b)=>b.trend-a.trend)[0];
-  const pl=PER_LABEL[rollPer]||rollPer;
-  $('v-roll').innerHTML=`<div class="card noprint" style="margin-bottom:14px"><div class="row">
-    <label class="muted">Year</label><select id="rY">${years.sort().map(y=>`<option ${y===rollYear?'selected':''}>${y}</option>`).join('')}</select>
-    <label class="muted">Period</label><select id="rP">${Object.keys(PER).map(p=>`<option value="${p}" ${p===rollPer?'selected':''}>${PER_LABEL[p]||p}</option>`).join('')}</select>
-    <div class="row" style="margin-left:auto"><button class="btn sm" id="rExp">Export CSV</button><button class="btn sm" onclick="window.print()">Print</button></div></div></div>
-  <div class="grid cards"><div class="card stat"><h3>${pl} ${rollYear} average</h3><div class="v">${fx(overall)}</div><div class="s">${overall!=null?chip(gradeOf(overall)):'No grades in this period'}</div></div>
-    <div class="card stat"><h3>Top TS of the period</h3><div class="v" style="font-size:18px">${withG[0]?esc(withG[0].t.name):'—'}</div><div class="s">${withG[0]?withG[0].avgF.toFixed(2)+'% · '+esc(withG[0].t.region):''}</div></div>
-    <div class="card stat"><h3>Most improved</h3>${mi&&mi.trend>0?`<div class="v" style="font-size:18px">${esc(mi.t.name)}</div><div class="s" style="color:var(--good)">▲ +${mi.trend.toFixed(2)} pts within the period</div>`:'<div class="v">—</div>'}</div>
-    <div class="card stat"><h3>Best region</h3><div class="v" style="font-size:18px">${regs[0]?esc(regs[0].r):'—'}</div><div class="s">${regs[0]?regs[0].v.toFixed(2)+'%':''}</div></div></div>
-  <div class="card mt"><h3>${pl} ${rollYear} ranking — average of period final scores</h3><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Trade Supervisor</th><th>Region</th>${months.map(m=>`<th class="num" title="${esc(monthLabel(m))}">${monthShort(m)}</th>`).join('')}${KPIS.map(k=>`<th class="num">${k.short}</th>`).join('')}<th class="num">Average</th><th>Grade</th><th class="num">Trend</th></tr></thead><tbody>
-    ${rows.map((x,i)=>`<tr><td>${x.avgF!=null?i+1:''}</td><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.region)}</td>${x.h.map(h=>`<td class="num">${h?`<span style="color:${h.c.grade.color}">${h.c.final.toFixed(1)}</span>`:'<span class="muted">—</span>'}</td>`).join('')}
-      ${KPIS.map(k=>`<td class="num">${pct(x.k[k.key])}</td>`).join('')}<td class="num"><b>${fx(x.avgF)}</b></td><td>${x.avgF!=null?chip(gradeOf(x.avgF)):'<span class="muted">—</span>'}</td>
-      <td class="num" style="color:${x.trend==null?'':x.trend>=0?'var(--good)':'var(--bad)'}">${x.trend==null?'—':(x.trend>=0?'▲ +':'▼ ')+x.trend.toFixed(1)}</td></tr>`).join('')}
-  </tbody></table></div><p class="muted" style="font-size:12px;margin-bottom:0">Columns = saved date ranges that start inside this ${pl}. Average counts only the ranges the TS was graded. Trend = last graded range minus first graded range.</p></div>
-  <div class="card mt"><h3>Region averages</h3>${regs.map((x,i)=>`<div class="kpibar"><div class="n">${i+1}. ${esc(x.r)}</div><div class="bar"><i style="width:${x.v}%;background:${gradeOf(x.v).color}"></i></div><div class="p">${x.v.toFixed(1)}%</div></div>`).join('')||'<div class="empty">No grades.</div>'}</div>`;
-  $('rY').onchange=e=>{rollYear=e.target.value;renderRoll()};$('rP').onchange=e=>{rollPer=e.target.value;renderRoll()};
-  $('rExp').onclick=()=>download(`TS_POSM_KPI_${rollYear}_${rollPer}.csv`,toCsv([['Rank','Region','Trade Supervisor',...months.map(monthLabel),...KPIS.map(k=>k.short+' %'),'Deductions','Average %','Grade','Trend'],
-    ...rows.map((x,i)=>[x.avgF!=null?i+1:'',x.t.region,x.t.name,...x.h.map(h=>h?h.c.final.toFixed(2):''),...KPIS.map(k=>x.k[k.key]==null?'':(x.k[k.key]*100).toFixed(2)),x.ded||'',x.avgF==null?'':x.avgF.toFixed(2),x.avgF!=null?gradeOf(x.avgF).label:'',x.trend==null?'':x.trend.toFixed(2)])]),'text/csv');
 }
 
 /* =====================================================================
@@ -760,39 +693,38 @@ let pending=null;
 function renderImp(){
   const src=S.sources,lp=src.lastPull;
   $('v-imp').innerHTML=`<div class="card" style="margin-bottom:14px"><h3>Connected RMAS tools — automatic data pull</h3>
-    <div class="row" style="margin-bottom:10px"><button class="btn pri" id="pullAll">Pull ALL tools → ${monthLabel(month())}</button><span class="muted" style="font-size:12px">Then check the <b>Data check</b> box below to see what was read and what was skipped.</span></div>
+    <div class="row" style="margin-bottom:10px"><button class="btn pri" id="pullAll">Pull ALL tools now</button><span class="muted" style="font-size:12px">Then check the <b>Data check</b> box below to see what was read and what was skipped.</span></div>
     <p class="muted" style="font-size:12.5px;margin-top:0">The KPI tool reads data directly from your other RMAS tools' Google Sheets — no export, no upload. Pulled values fill the grade automatically (blue fields) and never overwrite numbers RMAS typed manually.</p>
     <div class="tbl-wrap"><table><thead><tr><th>Tool</th><th>Status</th><th>Fills in the KPI</th></tr></thead><tbody>
-      <tr><td><b>Inventory Tool</b></td><td>${src.inventoryUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal">Request POSM delivered per TS (requests marked <i>Delivered</i> with a delivery date inside the selected date range) — RMAS then verifies they were deployed; no request = 100% once verified. Also the Trade Supervisor master list.</td></tr>
+      <tr><td><b>Inventory Tool</b></td><td>${src.inventoryUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal">Request POSM delivered per TS (all requests marked <i>Delivered</i>) — RMAS then verifies they were deployed; no request = 100% once verified. Also the Trade Supervisor master list.</td></tr>
       <tr><td><b>Deployment KPI Tool</b></td><td>${src.deploymentUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal" class="muted">Target, Complete, Incomplete, Incomplete Full Deployment per TS per BU</td></tr>
       <tr><td><b>POSM Audit</b></td><td><span class="tag">Coming soon</span></td><td style="white-space:normal" class="muted">Stores audited, stores with verified display, reported with photo proof</td></tr>
     </tbody></table></div>
     <label class="muted" style="font-size:12px;display:block;margin-top:12px">Inventory Tool — Apps Script Web App URL (the same URL your Inventory Tool uses)</label>
     <div class="row" style="margin-top:4px"><input id="invUrl" value="${esc(src.inventoryUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="invSave">Save &amp; test</button></div>
     <div class="row" style="margin-top:10px">
-      <button class="btn" id="invPull" ${src.inventoryUrl?'':'disabled'}>Pull ${monthLabel(month())} now</button>
+      <button class="btn" id="invPull" ${src.inventoryUrl?'':'disabled'}>Pull now</button>
       <button class="btn sm" id="invTs" ${src.inventoryUrl?'':'disabled'}>Sync TS list from Inventory Tool</button>
-      <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="invAuto" ${src.autoPull?'checked':''}> Auto-pull the selected date range when the tool opens (Admin)</label></div>
-    <div class="row" style="margin-top:10px"><button class="btn sm" id="bulkVerify">Mark TS with NO request in this period as verified complete (100%)</button><span class="muted" style="font-size:11.5px">Only do this after RMAS has checked their deployment.</span></div>
-    <div id="invRes" style="margin-top:10px">${lp?`<div class="flag blue" style="margin-top:0">Last pull: ${esc(monthLabel(lp.month))} · ${new Date(lp.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(lp.summary)}</div>`:''}</div>
-    <p class="muted" style="font-size:11.5px;margin-bottom:0">Optional but recommended: add the small <b>getKpiData</b> action to the Inventory Tool's Code.gs so the pull reads <i>all</i> requests in the date range (the standard getData only returns the latest 1,000). Already installed the old month version? Download and replace it — the old one still works, just slower. <a href="#" id="invAddon" style="color:var(--accent)">Download Inventory add-on</a></p>
+      <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="invAuto" ${src.autoPull?'checked':''}> Auto-pull when the tool opens and every 10 min (Admin)</label></div>
+    <div class="row" style="margin-top:10px"><button class="btn sm" id="bulkVerify">Mark TS with NO request as verified complete (100%)</button><span class="muted" style="font-size:11.5px">Only do this after RMAS has checked their deployment.</span></div>
+    <div id="invRes" style="margin-top:10px">${lp?`<div class="flag blue" style="margin-top:0">Last pull: ${new Date(lp.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(lp.summary)}</div>`:''}</div>
+    <p class="muted" style="font-size:11.5px;margin-bottom:0">Optional but recommended: add the small <b>getKpiData</b> action to the Inventory Tool's Code.gs so the pull reads <i>all</i> requests (the standard getData only returns the latest 1,000). An add-on you installed before also works — no need to replace it. <a href="#" id="invAddon" style="color:var(--accent)">Download Inventory add-on</a></p>
     <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:12px">
     <label class="muted" style="font-size:12px;display:block">Deployment KPI Tool (POSM KPI Command Center) — Apps Script Web App URL</label>
     <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
     <div class="row" style="margin-top:10px">
-      <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull deployment status → ${monthLabel(month())}</button>
-      <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="depAuto" ${src.depAutoPull?'checked':''}> Auto-pull when the tool opens (only if the date range includes today)</label></div>
-    <div id="depRes" style="margin-top:10px">${src.depLastPull?`<div class="flag blue" style="margin-top:0">Last pull: ${esc(monthLabel(src.depLastPull.month))} · ${new Date(src.depLastPull.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(src.depLastPull.summary)}</div>`:''}</div>
-    <p class="muted" style="font-size:11.5px;margin-bottom:0">The Deployment KPI Tool keeps only the <b>current</b> status per store (no date history), so each pull is a snapshot of today saved into the selected date range. Pull while the range is still running (it includes today); once the range has ended, its grade keeps the last snapshot. Renamed TS (RENAME_TS in MasterChanges) are applied automatically.</p></div>
+      <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull deployment status now</button>
+      <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="depAuto" ${src.depAutoPull?'checked':''}> Auto-pull when the tool opens and every 10 min (Admin)</label></div>
+    <div id="depRes" style="margin-top:10px">${src.depLastPull?`<div class="flag blue" style="margin-top:0">Last pull: ${new Date(src.depLastPull.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(src.depLastPull.summary)}</div>`:''}</div>
+    <p class="muted" style="font-size:11.5px;margin-bottom:0">Each pull takes the <b>current</b> status per store, so the KPI always follows what is in the Deployment KPI Tool right now. Renamed TS (RENAME_TS in MasterChanges) are applied automatically.</p></div>
   </div>
   <div class="card" style="margin-bottom:14px" id="diagCard"></div>
   <div class="grid two">
    <div class="card"><h3>Import data from RMAS tools</h3>
-    <p class="muted" style="font-size:12.5px;margin-top:0">Upload a CSV export from the Deployment KPI Tool, Inventory Tool, POSM Audit, or any sheet. Columns are detected by name and rows for the same TS / BU are <b>summed</b> into the selected date range. If the file has a <b>DATE</b> column, only rows inside the range are imported. Your deployment KPI export works directly: one row per store with a <b>STATUS</b> column (Complete / Incomplete / Incomplete Full Deployment) is counted automatically. Auto-filled fields show in blue on the Encode page.</p>
+    <p class="muted" style="font-size:12.5px;margin-top:0">Upload a CSV export from the Deployment KPI Tool, Inventory Tool, POSM Audit, or any sheet. Columns are detected by name and rows for the same TS / BU are <b>summed</b> into the live grade. Your deployment KPI export works directly: one row per store with a <b>STATUS</b> column (Complete / Incomplete / Incomplete Full Deployment) is counted automatically. Auto-filled fields show in blue on the Encode page.</p>
     <div class="fields" style="margin-top:10px">
       <div><label>Source</label><select id="iSrc" style="width:100%"><option>Deployment KPI Tool</option><option>Inventory Tool</option><option>POSM Audit</option><option>Report Tracker</option><option>Other</option></select></div>
       <div><label>BU if file has no BU column</label><select id="iBU" style="width:100%">${BUS.map(b=>`<option>${b}</option>`).join('')}</select></div>
-      <div><label>Imports into</label><div style="padding:8px 0;font-weight:600">${esc(monthLabel(month()))}</div></div>
     </div>
     <div class="row" style="margin-top:12px"><label class="btn pri">Choose CSV file<input type="file" id="iFile" accept=".csv" hidden></label><button class="btn sm" id="iTpl">Template (totals)</button><button class="btn sm" id="iTpl2">Template (per store status)</button></div>
     <label class="row" style="margin-top:10px;font-size:12.5px;gap:8px"><input type="checkbox" id="iAddTs"> Add Trade Supervisors not yet in the list (uses REGION column)</label>
@@ -827,8 +759,8 @@ function renderImp(){
     try{const d=await fetchInventory(month());renderImp();$('invRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.tradeSupervisors.length} TS, ${d.posmMaster.length} POSM, ${d.requests.length} request rows read${d.lite?'':' (standard getData)'}.</div>`}
     catch(e){$('invRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Inventory Tool: ${esc(e.message)}. Check that the URL ends in /exec and the deployment access is "Anyone".</div>`}};
   $('bulkVerify').onclick=()=>{const m=month();const list=S.ts.filter(t=>{const r=recOf(m,t.id);return !(r&&agg(r).delivered>0)&&!(r&&r.reqVerify)});
-    if(!list.length)return toast('No unverified TS without requests in this period');
-    modalConfirm(`Mark ${list.length} TS with no request POSM delivered in ${monthLabel(m)} as verified complete (Request deployment = 100%)?`,()=>{list.forEach(t=>{const k=m+'|'+t.id;const r=S.records[k]||{bu:{},deductions:[],src:{},remarks:''};r.reqVerify='verified';S.records[k]=r});save();toast(list.length+' TS verified');render()})};
+    if(!list.length)return toast('No unverified TS without requests');
+    modalConfirm(`Mark ${list.length} TS with no request POSM delivered as verified complete (Request deployment = 100%)?`,()=>{list.forEach(t=>{const k=m+'|'+t.id;const r=S.records[k]||{bu:{},deductions:[],src:{},remarks:''};r.reqVerify='verified';S.records[k]=r});save();toast(list.length+' TS verified');render()})};
   $('invPull').onclick=()=>pullInventory(month(),true);
   $('invTs').onclick=()=>syncTsFromInventory(true);
   $('invAuto').onchange=e=>{S.sources.autoPull=e.target.checked;save();toast(e.target.checked?'Auto-pull on':'Auto-pull off')};
@@ -851,7 +783,6 @@ function prepImport(rows){
   const fields=Object.keys(idx).filter(k=>!['month','ts','bu','region','status'].includes(k)&&!(statusMode&&['required','complete','fullDep'].includes(k)));if(!fields.length&&!statusMode)return toast('No KPI columns recognized — download the template');
   const P0=month(),defBU=$('iBU').value;const groups={};let bad=0,out=0;
   rows.slice(1).forEach(r=>{const name=(r[idx.ts]||'').trim();if(!name)return;const m=P0;
-    if(idx.month!=null){const ok=rowInRange(r[idx.month],P0);if(ok===null){bad++;return}if(!ok){out++;return}}
     const bu=idx.bu!=null?(normBU(r[idx.bu])||defBU):defBU;const key=m+'|'+nameKey(name);
     const g=groups[key]=groups[key]||{m,name,region:idx.region!=null?(r[idx.region]||'').trim():'',vals:{}};
     if(statusMode){const k=statusKind(r[idx.status]);if(k){const P=f=>`bu.${bu}.${f}`;['required','complete','fullDep'].forEach(f=>{g.vals[P(f)]=g.vals[P(f)]||0});g.vals[P('required')]++;if(k!=='incomplete')g.vals[P(k)]++}}
@@ -859,9 +790,9 @@ function prepImport(rows){
   const list=Object.values(groups).map(g=>({...g,t:findTs(g.name)}));
   pending={list,src:$('iSrc').value};
   const found=list.filter(x=>x.t).length;
-  $('iPrev').innerHTML=`<div class="flag blue" style="margin-top:0">Detected: ${statusMode?'<b>STATUS per row</b> (Complete / Incomplete / Incomplete Full Deployment → counted per BU)'+(fields.length?', ':''):''}${fields.map(f=>COL_LABEL[f]).join(', ')}${idx.bu==null&&(statusMode||fields.some(f=>BU_KEYS.includes(f)))?` → BU <b>${defBU}</b>`:''}. ${list.length} TS into <b>${esc(monthLabel(P0))}</b>: <b>${found} matched</b>, ${list.length-found} unknown TS${out?`, ${out} row(s) outside the date range skipped`:''}${bad?`, ${bad} row(s) with unreadable date skipped`:''}.</div>
-    <div class="tbl-wrap" style="max-height:260px;overflow:auto;margin-top:8px"><table><thead><tr><th>Date range</th><th>Trade Supervisor</th><th>Status</th><th>Values</th></tr></thead><tbody>
-    ${list.map(x=>`<tr><td>${esc(monthShort(x.m))}</td><td>${esc(x.name)}</td><td>${x.t?'<span class="tag ack">Matched</span>':'<span class="tag pen">Unknown TS</span>'}</td><td class="muted" style="white-space:normal;font-size:11.5px">${Object.entries(x.vals).map(([p,v])=>`${p.startsWith('bu.')?p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]:FIELD_LABEL[p]}: ${v}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
+  $('iPrev').innerHTML=`<div class="flag blue" style="margin-top:0">Detected: ${statusMode?'<b>STATUS per row</b> (Complete / Incomplete / Incomplete Full Deployment → counted per BU)'+(fields.length?', ':''):''}${fields.map(f=>COL_LABEL[f]).join(', ')}${idx.bu==null&&(statusMode||fields.some(f=>BU_KEYS.includes(f)))?` → BU <b>${defBU}</b>`:''}. ${list.length} TS: <b>${found} matched</b>, ${list.length-found} unknown TS.</div>
+    <div class="tbl-wrap" style="max-height:260px;overflow:auto;margin-top:8px"><table><thead><tr><th>Trade Supervisor</th><th>Status</th><th>Values</th></tr></thead><tbody>
+    ${list.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.t?'<span class="tag ack">Matched</span>':'<span class="tag pen">Unknown TS</span>'}</td><td class="muted" style="white-space:normal;font-size:11.5px">${Object.entries(x.vals).map(([p,v])=>`${p.startsWith('bu.')?p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]:FIELD_LABEL[p]}: ${v}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
     <div class="row" style="margin-top:10px"><button class="btn pri" id="iApply">Apply import</button><button class="btn sm" id="iCancel">Cancel</button></div>`;
   $('iCancel').onclick=()=>{pending=null;$('iPrev').innerHTML=''};
   $('iApply').onclick=applyImport;
@@ -876,7 +807,7 @@ function newDiag(src,m){return DIAG[src]={src,month:m,at:new Date(),read:0,used:
 /* ---------- Inventory Tool connector ---------- */
 async function fetchInventory(m){const u=S.sources.inventoryUrl;if(!u)throw new Error('No Inventory Tool URL');const q=u.includes('?')?'&':'?';
   let d=null,lite=false;
-  try{const r=await fetch(u+q+'action=getKpiData&start='+encodeURIComponent(pStart(m))+'&end='+encodeURIComponent(pEnd(m))+'&t='+Date.now());const j=await r.json();if(j&&Array.isArray(j.requests)&&!j.error){d=j;lite=true}}catch(e){}
+  try{const r=await fetch(u+q+'action=getKpiData&t='+Date.now());const j=await r.json();if(j&&Array.isArray(j.requests)&&!j.error){d=j;lite=true}}catch(e){}
   if(!d){const r=await fetch(u+q+'action=getData&t='+Date.now());d=await r.json();if(!d||!Array.isArray(d.requests))throw new Error(d&&d.error?d.error:'Unexpected response')}
   d.tradeSupervisors=d.tradeSupervisors||[];d.posmMaster=d.posmMaster||[];d.lite=lite;return d}
 function monthOf(v){if(!v)return '';const s=String(v);if(/^\d{4}-\d{2}/.test(s))return s.slice(0,7);const d=new Date(s);return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
@@ -888,18 +819,18 @@ async function pullInventory(m,manual){
     const D=newDiag('inv',m);D.read=d.requests.length;const rawBu={};d.posmMaster.forEach(p=>rawBu[String(p.code)]=p.bu);
     d.requests.forEach(r=>{tally(D.status,r.status);if(String(r.status).toLowerCase()==='delivered')tally(D.months,monthOf(r.dateDelivered)||'(no date)')});
     if(!d.lite&&d.requests.length>=1000)D.note='Only the latest 1,000 requests were returned by getData — install the Inventory add-on to read all of them.';
-    const del=d.requests.filter(r=>{if(String(r.status).toLowerCase()!=='delivered'){tally(D.skip,'status not Delivered');return false}if(!inPeriod(dateOf(r.dateDelivered),m)){tally(D.skip,dateOf(r.dateDelivered)?'delivered outside the date range':'no delivery date');return false}return true});
+    const del=d.requests.filter(r=>{if(String(r.status).toLowerCase()!=='delivered'){tally(D.skip,'status not Delivered');return false}return true});
     const groups={};let noBU=0;
     del.forEach(r=>{const tsRec=tsById[String(r.ts)];const name=String(tsRec?tsRec.name:r.ts||'').trim();if(!name){tally(D.skip,'no Trade Supervisor');return}const bu=buByCode[String(r.posmCode)];
       if(!bu){noBU++;tally(D.skip,'BU not recognized');tally(D.badBU,rawBu[String(r.posmCode)]===undefined?'(POSM code not in master: '+r.posmCode+')':rawBu[String(r.posmCode)]);return}D.used++;
       const g=groups[nameKey(name)]=groups[nameKey(name)]||{m,name,region:tsRec?tsRec.region:'',vals:{}};const p=`bu.${bu}.delivered`;g.vals[p]=(g.vals[p]||0)+n(r.qty)});
-    // TS with no deliveries in the range but active in Inventory → Delivered = 0 is NOT written (unknown vs zero), so we only fill who had deliveries
+    // TS with no deliveries but active in Inventory → Delivered = 0 is NOT written (unknown vs zero), so we only fill who had deliveries
     const res=applyGroups(Object.values(groups),'Inventory Tool',{respectManual:true,addNew:true});
     const partial=!d.lite&&d.requests.length>=1000;
     const summary=`${del.length} delivered request line(s) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in KPI list (${res.skipped.slice(0,3).map(esc).join(', ')}${res.skip>3?'…':''})`:''}${noBU?`, ${noBU} line(s) with unknown BU`:''}${partial?' · ⚠ only latest 1,000 requests read — install the add-on':''}`;
     S.sources.lastPull={month:m,at:new Date().toISOString(),summary};save();
-    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU||partial?'':'green'}" style="margin-top:0">Inventory Tool · ${esc(monthLabel(m))}: ${summary}.${res.skip?' Use <b>Sync TS list</b> to add missing TS.':''}</div>`;
-    if(manual)toast('Pulled from Inventory Tool');renderDiag();if(view!=='imp')render();return res}
+    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU||partial?'':'green'}" style="margin-top:0">Inventory Tool: ${summary}.${res.skip?' Use <b>Sync TS list</b> to add missing TS.':''}</div>`;
+    if(manual)toast('Pulled from Inventory Tool');renderDiag();if(!BG&&view!=='imp')render();return res}
   catch(e){if(box)box.innerHTML=`<div class="flag red" style="margin-top:0">Pull failed: ${esc(e.message)}</div>`;if(manual)toast('Pull failed: '+e.message)}}
 async function syncTsFromInventory(manual){
   try{const d=await fetchInventory(month());let add=0,reg=0;
@@ -916,7 +847,6 @@ async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw ne
 let depUnknown=[];
 async function pullDeployments(m,manual,confirmed){
   if(!S.sources.deploymentUrl)return;
-  if(!periodHasToday(m)&&!confirmed){if(!manual)return;return modalConfirm(`The Deployment KPI Tool only has TODAY's status (no date history), and ${monthLabel(m)} does not include today. Save today's status into this date range anyway?`,()=>pullDeployments(m,true,true))}
   const box=$('depRes');if(box)box.innerHTML='<div class="flag blue" style="margin-top:0">Pulling deployment status…</div>';
   try{const d=await fetchDeployments();
     // apply TS renames from MasterChanges (oldest first)
@@ -935,22 +865,22 @@ async function pullDeployments(m,manual,confirmed){
     depUnknown=list.filter(x=>res.skipped.includes(x.name)).map(x=>({name:x.name,region:x.region}));
     const summary=`${d.records.length} store rows (${counts.complete} Complete, ${counts.fullDep} Inc. Full Dep., ${counts.incomplete} Incomplete) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${ren?`, ${ren} TS renamed`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in KPI list`:''}${noBU?`, ${noBU} row(s) with unknown BU`:''}`;
     S.sources.depLastPull={month:m,at:new Date().toISOString(),summary};save();fillRegions();
-    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU?'':'green'}" style="margin-top:0">Deployment KPI Tool → ${esc(monthLabel(m))}: ${summary}.
+    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU?'':'green'}" style="margin-top:0">Deployment KPI Tool: ${summary}.
       ${depUnknown.length?`<br>Not in KPI list: ${depUnknown.slice(0,8).map(x=>esc(x.name)).join(', ')}${depUnknown.length>8?'…':''} <button class="btn sm" id="depAddTs" style="margin-left:6px">Add these ${depUnknown.length} TS &amp; pull again</button>`:''}</div>`;
     if($('depAddTs'))$('depAddTs').onclick=()=>{depUnknown.forEach(x=>{ensureTs(x.name,x.region)});save();fillRegions();pullDeployments(m,true,true)};
-    if(manual)toast('Deployment status pulled');renderDiag();if(view!=='imp')render();return res}
+    if(manual)toast('Deployment status pulled');renderDiag();if(!BG&&view!=='imp')render();return res}
   catch(e){if(box)box.innerHTML=`<div class="flag red" style="margin-top:0">Pull failed: ${esc(e.message)}</div>`;if(manual)toast('Pull failed: '+e.message)}}
 async function pullAllSources(m,manual){const src=S.sources;
   if(src.inventoryUrl)await syncTsFromInventory(false);
   if(src.deploymentUrl)await pullDeployments(m,manual);
   if(src.inventoryUrl)await pullInventory(m,manual);
-  if(manual)toast('All connected tools pulled — see Data check')}
+  if(manual)toast('Latest data pulled from all connected tools')}
 function renderDiag(){const box=$('diagCard');if(!box)return;const names={dep:'Deployment KPI Tool',inv:'Inventory Tool'};
   const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]);
   const list=o=>top(o).map(([k,v])=>`<span class="tag" style="margin:2px">${esc(k)}: ${v}</span>`).join('')||'<span class="muted">—</span>';
   const bad=new Set();Object.values(DIAG).forEach(D=>Object.keys(D.badBU).forEach(k=>{if(!k.startsWith('(POSM code'))bad.add(k)}));
   const blocks=['dep','inv'].filter(k=>DIAG[k]).map(k=>{const D=DIAG[k];return `<div class="sect" style="margin:10px 0 0">
-    <div class="hd"><b>${names[k]}</b><span>${D.used} of ${D.read} rows used · ${esc(monthLabel(D.month))}</span></div>
+    <div class="hd"><b>${names[k]}</b><span>${D.used} of ${D.read} rows used · ${D.at.toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'})}</span></div>
     ${D.note?`<p style="margin:4px 0 8px">${esc(D.note)}</p>`:''}
     <div style="font-size:12px;margin:4px 0"><span class="muted">Skipped:</span> ${list(D.skip)}</div>
     ${Object.keys(D.badBU).length?`<div style="font-size:12px;margin:4px 0"><span class="muted">Unrecognized BU values:</span> ${list(D.badBU)}</div>`:''}
@@ -980,23 +910,19 @@ function applyGroups(list,srcName,opt={}){let upd=0,added=0,skip=0,reack=0,kept=
   return {upd,added,skip,reack,kept,skipped}}
 const INV_ADDON=`/**
  * ADD-ON for the RMAS POSM Inventory Tool Code.gs — lets the TS POSM KPI tool
- * read ALL requests in a date range (getData only returns the latest 1,000).
+ * read ALL requests (getData only returns the latest 1,000).
  *
- * 1) In doGet(), add this line next to the other "if (action === ...)" lines
- *    (if you installed the older month version, REPLACE that line and the function):
+ * 1) In doGet(), add this line next to the other "if (action === ...)" lines:
  *
- *      if (action === 'getKpiData') return jsonOut_(getKpiData_(e.parameter.start, e.parameter.end));
+ *      if (action === 'getKpiData') return jsonOut_(getKpiData_());
  *
  * 2) Paste the function below anywhere in Code.gs.
  * 3) Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
  *    (Same URL — no need to change anything in the Inventory Tool.)
  */
-function getKpiData_(start, end) {
-  const s = String(start || ''), en = String(end || s);
-  const inRange = v => { const d = String(normalizeDateValue_(v) || '').slice(0, 10); return d && d >= s && d <= en; };
+function getKpiData_() {
   return {
     requests: readTable_('requests')
-      .filter(r => !s || inRange(r.dateDelivered) || inRange(r.dateCreated))
       .map(r => ({ id: r.id, posmCode: r.posmCode, qty: Number(r.qty) || 0, store: r.store, ts: r.ts, status: r.status,
                    dateCreated: normalizeDateValue_(r.dateCreated), dateDelivered: normalizeDateValue_(r.dateDelivered), dueDate: normalizeDateValue_(r.dueDate) })),
     posmMaster: readTable_('posm').map(r => ({ code: r.code, bu: r.bu })),
@@ -1008,11 +934,11 @@ function getKpiData_(start, end) {
 let syncState={cls:'',txt:'Offline'},pushT=null;
 function setSync(cls,txt){syncState={cls,txt};$('syncStat').className='sync '+cls;$('syncStat').textContent=txt;if($('gStat')){$('gStat').className='sync '+cls;$('gStat').textContent=txt}}
 function schedulePush(){if(!sheetUrl)return;clearTimeout(pushT);setSync('','Saving…');pushT=setTimeout(()=>pushRemote(false),1200)}
-function flatRows(){const head=['Start Date','End Date','Region','Trade Supervisor',...BU_PATHS.map(p=>p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]),...FLAT_KEYS.map(f=>FIELD_LABEL[f]),...KPIS.map(k=>k.short+' %'),'Weighted %','Deductions','Final %','Grade','Acknowledgment','TS Comment','Remarks'];
-  const out=[head];const months=[...new Set(Object.keys(S.records).map(k=>k.split('|')[0]))].sort();
+function flatRows(){const head=['Region','Trade Supervisor',...BU_PATHS.map(p=>p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]),...FLAT_KEYS.map(f=>FIELD_LABEL[f]),...KPIS.map(k=>k.short+' %'),'Weighted %','Deductions','Final %','Grade','Acknowledgment','TS Comment','Remarks','Last Updated'];
+  const out=[head];const months=[LIVE];
   const all=[];months.forEach(m=>[...S.ts].sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name)).forEach(t=>all.push([m+'|'+t.id,S.records[m+'|'+t.id]||null])));
-  all.forEach(([k,r])=>{const [m,id]=k.split('|');const t=S.ts.find(x=>x.id===id);if(!t)return;if(!r){out.push([pStart(m),pEnd(m),t.region,t.name,...BU_PATHS.map(()=>''),...FLAT_KEYS.map(()=>''),...KPIS.map(()=>''),'','','','Not graded','','','']);return}const c=compute(r);
-    out.push([pStart(m),pEnd(m),t.region,t.name,...BU_PATHS.map(p=>getP(r,p)??''),...FLAT_KEYS.map(f=>r[f]??''),...KPIS.map(k=>c.scores[k.key]==null?'':+(c.scores[k.key]*100).toFixed(2)),c.weighted==null?'':+c.weighted.toFixed(2),c.ded||'',c.final==null?'':+c.final.toFixed(2),c.grade?.label||'',r.ack?.status||(c.final!=null?'pending':''),r.ack?.comment||'',r.remarks||''])});return out}
+  all.forEach(([k,r])=>{const [m,id]=k.split('|');const t=S.ts.find(x=>x.id===id);if(!t)return;if(!r){out.push([t.region,t.name,...BU_PATHS.map(()=>''),...FLAT_KEYS.map(()=>''),...KPIS.map(()=>''),'','','','Not graded','','','','']);return}const c=compute(r);
+    out.push([t.region,t.name,...BU_PATHS.map(p=>getP(r,p)??''),...FLAT_KEYS.map(f=>r[f]??''),...KPIS.map(k=>c.scores[k.key]==null?'':+(c.scores[k.key]*100).toFixed(2)),c.weighted==null?'':+c.weighted.toFixed(2),c.ded||'',c.final==null?'':+c.final.toFixed(2),c.grade?.label||'',r.ack?.status||(c.final!=null?'pending':''),r.ack?.comment||'',r.remarks||'',r.updated?new Date(r.updated).toLocaleString('en'):''])});return out}
 const nowT=()=>new Date().toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'});
 // Adopt a merged state from the server without losing edits made meanwhile; re-render safely (never while typing a grade).
 function adopt(remote){const before=JSON.stringify(S);S=normalizeState(mergeState(remote,S));lastSnap=snap();lsSet(STORE_KEY,JSON.stringify(S));
@@ -1126,19 +1052,19 @@ function renderSet(){
      <div class="row" style="margin-top:8px"><button class="btn sm" id="sDAdd">+ Add deduction</button><button class="btn sm pri" id="sDSave">Save list</button></div>
      <h3 style="margin-top:20px">Admin password</h3>
      <div class="row"><input type="password" id="sP1" placeholder="New password" style="flex:1;min-width:120px"><input type="password" id="sP2" placeholder="Confirm" style="flex:1;min-width:120px"><button class="btn sm pri" id="sPSave">Change</button></div>
-     <p class="muted" style="font-size:11.5px">Viewer mode (for TS) can see the dashboard, scorecards and roll-ups, and acknowledge/dispute grades. Only Admin can encode, import and change settings.</p></div></div>
+     <p class="muted" style="font-size:11.5px">Viewer mode (for TS) can see the dashboard and scorecards, and acknowledge/dispute grades. Only Admin can encode, import and change settings.</p></div></div>
   <div class="grid two mt">
    <div class="card"><h3>Trade Supervisors</h3>
      <div class="row" style="margin-bottom:10px"><input id="sTsName" placeholder="Trade Supervisor name" style="flex:1;min-width:150px"><input id="sTsRegion" placeholder="Region" list="regList" style="width:140px"><datalist id="regList">${regions().map(r=>`<option value="${esc(r)}">`).join('')}</datalist><button class="btn sm pri" id="sTsAdd">Add</button></div>
      <div class="row" style="margin-bottom:10px"><label class="btn sm">Import TS list CSV (REGION, TRADE SUPERVISOR)<input type="file" id="sTsImp" accept=".csv" hidden></label></div>
-     <div class="tbl-wrap" style="max-height:360px;overflow:auto"><table><thead><tr><th>Region</th><th>Trade Supervisor</th><th class="num">Ranges graded</th><th></th></tr></thead><tbody>
-     ${[...S.ts].sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name)).map(t=>`<tr><td>${esc(t.region)}</td><td>${esc(t.name)}${(t.aliases||[]).length?`<div class="muted" style="font-size:11px">also: ${t.aliases.map(esc).join(', ')}</div>`:''}</td><td class="num">${Object.keys(S.records).filter(k=>k.endsWith('|'+t.id)).length}</td><td style="white-space:nowrap"><button class="btn sm" data-merge="${t.id}" title="Same person with a different spelling? Merge into another TS">Merge</button> <button class="btn sm danger" data-del="${t.id}">Delete</button></td></tr>`).join('')}</tbody></table></div></div>
+     <div class="tbl-wrap" style="max-height:360px;overflow:auto"><table><thead><tr><th>Region</th><th>Trade Supervisor</th><th class="num">Final</th><th></th></tr></thead><tbody>
+     ${[...S.ts].sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name)).map(t=>`<tr><td>${esc(t.region)}</td><td>${esc(t.name)}${(t.aliases||[]).length?`<div class="muted" style="font-size:11px">also: ${t.aliases.map(esc).join(', ')}</div>`:''}</td><td class="num">${(()=>{const r=recOf(LIVE,t.id);const c=r?compute(r):null;return c&&c.final!=null?c.final.toFixed(2)+'%':'—'})()}</td><td style="white-space:nowrap"><button class="btn sm" data-merge="${t.id}" title="Same person with a different spelling? Merge into another TS">Merge</button> <button class="btn sm danger" data-del="${t.id}">Delete</button></td></tr>`).join('')}</tbody></table></div></div>
    <div class="card"><h3>Data</h3>
      <div class="row"><button class="btn sm" id="sExpAll">Export all grades (CSV)</button><button class="btn sm" id="sBackup">Backup (JSON)</button><label class="btn sm">Restore (JSON)<input type="file" id="sRestore" accept=".json" hidden></label><button class="btn sm danger" id="sReset">Clear all TS &amp; grades</button></div>
      <p class="muted" style="font-size:12px;margin-top:12px">${sheetUrl?'Connected to Google Sheets — changes sync to all devices.':'Offline mode: data is saved in this browser only. Connect Google Sheets in <b>Import &amp; Sync</b> for cross-device sync.'}</p>
      <h3 style="margin-top:18px">How the score is computed</h3>
      <div style="font-size:12.5px">${KPIS.map((k,i)=>`<p style="margin:6px 0"><b>${i+1}. ${k.name} (${S.weights[k.key]}%)</b> — ${k.formula}</p>`).join('')}
-     <p class="muted" style="margin-top:8px">Final = Σ(score × weight) − deductions. If a KPI has no data for the date range, its weight is redistributed over the KPIs that do. The watchlist flags TS declining 3 graded periods in a row, below 80% for 2 consecutive periods, rated Poor, or with a disputed grade.</p></div></div></div>`;
+     <p class="muted" style="margin-top:8px">Final = Σ(score × weight) − deductions. If a KPI has no data yet, its weight is redistributed over the KPIs that do. The watchlist flags TS below 80%, rated Poor, or with a disputed grade.</p></div></div></div>`;
   const upd=()=>{const t=[...document.querySelectorAll('[data-w]')].reduce((a,i)=>a+n(i.value),0);$('sWTot').textContent='Total: '+t+'%';$('sWTot').style.color=t===100?'var(--good)':'var(--bad)'};
   document.querySelectorAll('[data-w]').forEach(i=>i.oninput=upd);upd();
   $('sWSave').onclick=()=>{const w={};document.querySelectorAll('[data-w]').forEach(i=>w[i.dataset.w]=n(i.value));if(Object.values(w).reduce((a,b)=>a+b,0)!==100)return toast('Weights must total 100%');S.weights=w;save();toast('Weights saved');renderSet()};
@@ -1172,16 +1098,25 @@ function renderSet(){
   $('sRestore').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const x=JSON.parse(await f.text());if(!x.ts||!x.records)throw 0;S=normalizeState(x);save();fillRegions();render();toast('Backup restored')}catch(_){toast('Invalid backup file')}};
   $('sReset').onclick=()=>modalConfirm('Delete ALL Trade Supervisors and grades? Settings and connected tools are kept. Download a Backup first if unsure.',()=>{S.ts=[];S.records={};save();fillRegions();render();toast('All TS & grades cleared')});
 }
-function exportCsv(p){const rows=flatRows();const out=[rows[0],...rows.slice(1).filter(r=>!p||(r[0]===pStart(p)&&r[1]===pEnd(p)))];download(`TS_POSM_KPI_${p?pStart(p)+'_to_'+pEnd(p):'ALL'}.csv`,toCsv(out),'text/csv')}
+function exportCsv(){download(`TS_POSM_KPI_${todayYmd()}.csv`,toCsv(flatRows()),'text/csv')}
 
 /* =====================================================================
    BOOT
    ===================================================================== */
 applyRole();
-(async()=>{if(sheetUrl)await pullRemote(false);if(!isAdmin())return;const src=S.sources;
-  if(src.inventoryUrl)await syncTsFromInventory(false);
-  if(src.deploymentUrl&&src.depAutoPull&&periodHasToday(month()))await pullDeployments(month(),false);
-  if(src.inventoryUrl&&src.autoPull)await pullInventory(month(),false);render()})();
+// Continuous refresh: Admin devices pull the latest from the Deployment KPI Tool + Inventory Tool on open and every 10 minutes.
+// Background pulls never re-render the Encode / Settings / Import pages, so typing is not interrupted.
+let BG=false,refreshing=false;
+async function autoRefresh(){if(!isAdmin()||refreshing||document.visibilityState!=='visible')return;const src=S.sources;refreshing=true;BG=true;
+  try{if(src.inventoryUrl)await syncTsFromInventory(false);
+    if(src.deploymentUrl&&src.depAutoPull)await pullDeployments(LIVE,false);
+    if(src.inventoryUrl&&src.autoPull)await pullInventory(LIVE,false)}
+  finally{BG=false;refreshing=false}
+  if(['dash','card'].includes(view)&&!$('modalHost').innerHTML)render()}
+$('refreshBtn').onclick=async()=>{const b=$('refreshBtn');b.disabled=true;b.textContent='Refreshing…';
+  try{await pullAllSources(LIVE,true)}finally{b.disabled=false;b.textContent='Refresh data';render()}};
+setInterval(autoRefresh,600000);
+(async()=>{if(sheetUrl)await pullRemote(false);await autoRefresh();render()})();
 </script>
 </body>
 </html>
