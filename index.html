@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TS POSM KPI Grading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root{
   --bg:#06141b; --bg2:#0a1f29; --card:#0e2733; --card2:#123241; --line:#1d4556;
@@ -119,6 +123,105 @@ ol.steps li{margin:4px 0}
   .muted,th,.card h3{color:#444}
 }
 </style>
+<style>
+/* ---------- Report slide ---------- */
+#slideDlg{max-width:none;width:min(1340px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto}
+.sbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+.sbar h3{margin:0;font-size:16px}
+.sbar .grp{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sbar .grp span{font-size:13px;color:var(--muted)}
+.sbtn{border:1px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13.5px}
+.sbtn:hover{background:var(--hover)}
+.sbtn.primary{background:#2F57C9;border-color:#2F57C9;color:#fff}
+.sbtn:disabled{opacity:.6;cursor:progress}
+.sstage{padding:16px;background:var(--bg)}
+.sfit{position:relative;margin:0 auto;box-shadow:0 2px 14px rgba(5,15,20,.18)}
+.slide{
+  --bg:#EEF2F1; --panel:#FFFFFF; --ink:#10232C; --muted:#5B6E75; --line:#D5DEDF;
+  --brand:#1B3E9E; --band:#0F2A36; --band-ink:#E6EEF0;
+  --ok:#1D7A53; --ok-bg:#DDF1E7; --warn:#A96A00; --warn-bg:#FBEBCB; --bad:#B0332B; --bad-bg:#F8DEDB; --track:#E3E9EA;
+  width:1280px;height:720px;position:absolute;top:0;left:0;transform-origin:0 0;overflow:hidden;
+  background:var(--bg);color:var(--ink);font-family:"Barlow",system-ui,sans-serif;font-size:14px;line-height:1.35;
+  display:grid;grid-template-rows:auto auto 1fr auto;
+}
+.sl-head{background:var(--band);color:var(--band-ink);padding:20px 36px 18px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:5px solid #2F57C9}
+.sl-head h1{margin:0;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:36px;line-height:1}
+.sl-head p{margin:6px 0 0;color:#9FB4BB;font-size:15px}
+.sl-head .when{text-align:right;font-size:13px;color:#9FB4BB;white-space:nowrap}
+.sl-head .when b{display:block;color:var(--band-ink);font-size:15px;font-weight:600}
+.sl-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;padding:14px 36px 0}
+.sl-kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px 11px;border-top:4px solid var(--c,var(--line))}
+.sl-kpi h4{margin:0;font-size:13px;font-weight:600;color:var(--muted)}
+.sl-kpi .v{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:40px;line-height:1;margin-top:4px;color:var(--c,var(--ink))}
+.sl-kpi .v small{font-size:22px}
+.sl-kpi p{margin:3px 0 0;font-size:12px;line-height:1.25;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-kpi h4{white-space:nowrap}
+.sl-body{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;padding:14px 36px 0;min-height:0}
+.sl-box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;min-height:0;overflow:hidden}
+.sl-box h3{margin:0 0 6px;font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sl-box h3 span{font-size:12px;font-weight:500;color:var(--muted)}
+.sl-t{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.sl-t th{font-size:11.5px;color:var(--muted);font-weight:600;text-align:right;padding:3px 6px;border-bottom:1px solid var(--line);white-space:nowrap;line-height:16px;position:static;cursor:default;background:none}
+.sl-t th:first-child,.sl-t td:first-child{text-align:left}
+.sl-t td{padding:2px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:"Barlow Condensed",sans-serif;font-size:14px;font-weight:500;height:20px;line-height:16px;padding-top:1px;padding-bottom:1px}
+.sl-t td:first-child{font-family:"Barlow",sans-serif;font-size:13px;font-weight:600}
+.sl-t tr:last-child td{border-bottom:0}
+.sl-t tr.tot td{border-top:2px solid var(--ink);font-weight:700}
+.sl-t tr.foc td{background:#E8EEFB}
+.sl-t td.hc{text-align:center;font-weight:700}
+.sl-t td.h-ok{background:var(--ok-bg);color:var(--ok)}.sl-t td.h-warn{background:var(--warn-bg);color:var(--warn)}.sl-t td.h-bad{background:var(--bad-bg);color:var(--bad)}.sl-t td.h-na{color:var(--muted)}
+.sl-right{display:grid;grid-template-rows:1fr auto;gap:12px;min-height:0}
+.sl-find{background:var(--panel);border:1px solid var(--line);border-left:4px solid #2F57C9;border-radius:8px;padding:10px 14px}
+.sl-find h3{margin:0 0 4px;font-size:15px}
+.sl-find ul{margin:0;padding-left:18px;font-size:13px}
+.sl-find li{margin:3px 0}
+.sl-foot{display:flex;justify-content:space-between;gap:20px;padding:9px 36px 11px;font-size:11.5px;color:var(--muted)}
+.sl-foot .lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 4px 0 10px;vertical-align:-1px}
+#printHost{display:none}
+@media print{
+  @page{size:1280px 720px;margin:0}
+  body.printing>*:not(#printHost){display:none!important}
+  body.printing #printHost{display:block}
+  body.printing #printHost .slide{position:relative;transform:none}
+  body.printing{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+.sl-bar{height:12px;background:var(--track);border-radius:3px;position:relative;overflow:hidden}
+.sl-bar i{position:absolute;inset:0 auto 0 0;background:#2F57C9;border-radius:3px}
+.sl-bar i.full{background:var(--ok)}
+.sl-t.cat td{height:30px;font-size:15.5px}
+.sl-t.cat td:first-child{font-size:14px}
+.sl-left{display:grid;grid-template-rows:1fr auto;gap:12px;min-height:0}
+.sl-stack{display:flex;height:30px;border-radius:5px;overflow:hidden;margin:6px 0 8px}
+.sl-stack i{display:flex;align-items:center;justify-content:center;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;font-style:normal;min-width:0;overflow:hidden;white-space:nowrap}
+.sl-stk-l{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.sl-stk-l b{color:var(--ink);font-family:"Barlow Condensed",sans-serif;font-size:15px}
+.sl-stk-l i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+#slideDlg{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--card);color:var(--text);--panel:var(--card);--hover:var(--card2)}
+#slideDlg::backdrop{background:rgba(0,0,0,.65)}
+#slideDlg .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#slideDlg .seg button{border:0;background:none;padding:6px 12px;cursor:pointer;font-weight:600;font-size:13px;color:var(--muted)}
+#slideDlg .seg button+button{border-left:1px solid var(--line)}
+#slideDlg .seg button[aria-pressed="true"]{background:var(--accent);color:#04202a}
+.sbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;color:#04202a}
+.slide th{text-transform:none;letter-spacing:0}
+.slide .sl-head{border-bottom-color:#14B8AA}
+.sl-t td.lft,.sl-t th.lft{text-align:left}
+.sl-t td.rk{font-family:"Barlow Condensed",sans-serif;color:var(--muted);text-align:left}
+.sl-t .gchip{display:inline-block;padding:1px 8px;border-radius:99px;font-family:"Barlow",sans-serif;font-size:11.5px;font-weight:700;color:#10232C;line-height:16px}
+.sl-rb{display:grid;grid-template-columns:150px 1fr 34px 54px;gap:8px;align-items:center;height:19px;font-size:13px}
+.sl-rb span:first-child{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-rb .sl-bar{height:10px}
+.sl-rb small{color:var(--muted);font-size:11.5px;text-align:right}
+.sl-rb b{font-family:"Barlow Condensed",sans-serif;font-size:15px;text-align:right}
+.sl-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sl-coach{font-size:12.5px}
+.sl-coach div{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.4fr) 52px;gap:8px;padding:2px 0;border-bottom:1px solid var(--line);align-items:center}
+.sl-coach div:last-child{border-bottom:0}
+.sl-coach b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-coach span{color:var(--bad);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-coach em{font-style:normal;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:15px;text-align:right}
+.sl-none{color:var(--muted);font-size:13px;padding:6px 0}
+</style>
 </head>
 <body>
 <header>
@@ -132,6 +235,7 @@ ol.steps li{margin:4px 0}
       <select id="gRegion"></select>
       <span class="sync" id="syncStat">Offline</span>
       <button class="btn sm hidden" id="refreshBtn" title="Pull the latest data from the Deployment KPI Tool and Inventory Tool">Refresh data</button>
+      <button class="btn sm" id="slideBtn">Report slide</button>
       <button class="btn sm" id="roleBtn"></button>
     </div>
   </div>
@@ -151,6 +255,26 @@ ol.steps li{margin:4px 0}
   <section id="v-imp" class="hidden"></section>
   <section id="v-set" class="hidden"></section>
 </main>
+<dialog id="slideDlg" aria-labelledby="slideDlgTitle">
+  <div class="sbar">
+    <h3 id="slideDlgTitle">Report slide</h3>
+    <div class="grp">
+      <span>Ranking shows</span>
+      <div class="seg" id="slideSeg">
+        <button data-g="top" aria-pressed="true">Top 10</button>
+        <button data-g="bottom" aria-pressed="false">Bottom 10</button>
+      </div>
+    </div>
+    <div class="grp">
+      <button class="sbtn primary" id="slidePng">Download PNG</button>
+      <button class="sbtn" id="slideCopy">Copy image</button>
+      <button class="sbtn" id="slidePrint">Print or save PDF</button>
+      <button class="sbtn" id="slideClose">Close</button>
+    </div>
+  </div>
+  <div class="sstage" id="slideStage"><div class="sfit" id="slideFit"><div class="slide" id="slide"></div></div></div>
+</dialog>
+<div id="printHost"></div>
 <div class="toast" id="toast"></div>
 <div id="modalHost"></div>
 
@@ -418,7 +542,7 @@ function go(v){view=v;[...$('nav').children].forEach(x=>x.classList.toggle('acti
   ['dash','enc','card','imp','set'].forEach(x=>$('v-'+x).classList.toggle('hidden',x!==v));render();window.scrollTo(0,0)}
 $('nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.v)};
 $('gRegion').onchange=render;
-function render(){({dash:renderDash,enc:renderEnc,card:renderCard,imp:renderImp,set:renderSet})[view]()}
+function render(){({dash:renderDash,enc:renderEnc,card:renderCard,imp:renderImp,set:renderSet})[view]();if($('slideDlg')&&$('slideDlg').open)buildSlide()}
 function tsOptions(){const list=filteredTs();if(!selTs||!list.some(t=>t.id===selTs))selTs=list[0]?.id||null;
   return list.map(t=>`<option value="${t.id}" ${t.id===selTs?'selected':''}>${esc(t.name)} — ${esc(t.region)}</option>`).join('')}
 function openTs(id,v){selTs=id;go(v)}
@@ -1099,6 +1223,135 @@ function renderSet(){
   $('sReset').onclick=()=>modalConfirm('Delete ALL Trade Supervisors and grades? Settings and connected tools are kept. Download a Backup first if unsure.',()=>{S.ts=[];S.records={};save();fillRegions();render();toast('All TS & grades cleared')});
 }
 function exportCsv(){download(`TS_POSM_KPI_${todayYmd()}.csv`,toCsv(flatRows()),'text/csv')}
+
+
+/* =====================================================================
+   REPORT SLIDE
+   ===================================================================== */
+let slideMode="top";
+function buildSlide(){
+  const m=month(),list=filteredTs(),reg=$('gRegion').value;
+  const rows=list.map(t=>{const r=recOf(m,t.id);return {t,r,c:r?compute(r):null}});
+  const graded=rows.filter(x=>x.c&&x.c.final!=null);
+  const ranked=[...graded].sort((a,b)=>b.c.final-a.c.final);
+  const av=avg(graded.map(x=>x.c.final)),gAv=gradeOf(av);
+  const ackN=graded.filter(x=>x.r.ack?.status==='acknowledged').length,disN=graded.filter(x=>x.r.ack?.status==='disputed').length,penN=graded.length-ackN-disN;
+  const partN=graded.filter(x=>x.c.lines.some(l=>l.s==null)).length;
+  const wl=list.map(t=>({t,w:watch(t.id,m),c:recOf(m,t.id)?compute(recOf(m,t.id)):null})).filter(x=>x.w.length).sort((a,b)=>(a.c?.final??999)-(b.c?.final??999));
+  let req=0,dep=0;graded.forEach(x=>{BUS.forEach(b=>{const y=(x.r.bu||{})[b]||{};req+=n(y.required);dep+=Math.min(buDone(y),n(y.required))})});
+  const depRate=req?dep/req:null;
+  const tn=p=>p==null?'na':p>=.9?'ok':p>=.8?'warn':'bad';
+  const cv=t=>t==='na'?'var(--line)':`var(--${t})`;
+  const tile=(h,c,v,sub)=>`<div class="sl-kpi" style="--c:${c}"><h4>${h}</h4><div class="v">${v}</div><p>${sub}</p></div>`;
+  const kpis=
+    tile('Average POSM KPI',cv(tn(av==null?null:av/100)),av==null?'—':av.toFixed(1)+'<small>%</small>',gAv?`Rating: ${esc(gAv.label)}`:'No grades yet')+
+    tile('TS graded','var(--ink)',`${graded.length}<small> / ${list.length}</small>`,partN?`${partN} still partial (KPIs not encoded)`:'All grades complete')+
+    tile('Deployment rate',cv(tn(depRate)),depRate==null?'—':Math.round(depRate*100)+'<small>%</small>',`${fmtN(dep)} of ${fmtN(req)} done`)+
+    tile('Acknowledged',cv(graded.length?tn(ackN/graded.length):'na'),`${ackN}<small> / ${graded.length}</small>`,`${disN} disputed, ${penN} pending`)+
+    tile('Watchlist',wl.length?'var(--warn)':'var(--ok)',String(wl.length),'TS needing coaching or follow-up');
+
+  // ranking table
+  const rank=new Map(ranked.map((x,i)=>[x.t.id,i+1]));
+  const pick=slideMode==='top'?ranked.slice(0,10):ranked.slice(-10).reverse();
+  const heat=s=>`<td class="hc h-${tn(s)}">${s==null?'—':Math.round(s*100)+'%'}</td>`;
+  let rt=`<table class="sl-t"><colgroup><col style="width:5%"><col style="width:27%"><col style="width:15%"><col style="width:10%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:15%"></colgroup>
+    <thead><tr><th>#</th><th class="lft">Trade Supervisor</th><th style="text-align:left">Region</th>${KPIS.map(k=>`<th>${k.short==='Communication'?'Comm.':k.short==='Deployment'?'Deploy':k.short==='Reporting'?'Report':esc(k.short)}</th>`).join('')}<th>Final</th><th style="text-align:left">Grade</th></tr></thead><tbody>`;
+  rt+=pick.map(x=>{const part=x.c.lines.some(l=>l.s==null);
+    return `<tr><td class="rk">${rank.get(x.t.id)}</td><td class="lft" style="font-family:Barlow,sans-serif;font-size:13px;font-weight:600" title="${esc(x.t.name)}">${esc(x.t.name)}</td><td class="lft" style="font-family:Barlow,sans-serif;font-size:12.5px;color:var(--muted)">${esc(x.t.region)}</td>${KPIS.map(k=>heat(x.c.scores[k.key])).join('')}<td style="font-weight:700">${x.c.final.toFixed(1)}${part?'*':''}</td><td class="lft"><span class="gchip" style="background:${x.c.grade.color}">${esc(x.c.grade.label)}</span></td></tr>`}).join('')+'</tbody></table>';
+  if(!pick.length)rt='<div class="sl-none">No graded Trade Supervisors in this scope yet.</div>';
+
+  // watchlist
+  const WL=3;
+  let co=wl.slice(0,WL).map(x=>`<div><b title="${esc(x.t.name)}">${esc(x.t.name)} <small style="font-weight:500;color:var(--muted)">${esc(x.t.region)}</small></b><span title="${esc(x.w.join('; '))}">${esc(x.w.join('; '))}</span><em>${x.c&&x.c.final!=null?x.c.final.toFixed(1)+'%':'—'}</em></div>`).join('');
+  co=wl.length?`<div class="sl-coach">${co}</div>${wl.length>WL?`<div class="sl-none" style="padding:2px 0 0">and ${wl.length-WL} more on the watchlist</div>`:''}`:'<div class="sl-none">No Trade Supervisor is on the watchlist.</div>';
+
+  // region ranking
+  const regs=[...new Set(graded.map(x=>x.t.region))].map(r=>{const g=graded.filter(x=>x.t.region===r);return {r,v:avg(g.map(x=>x.c.final)),c:g.length}}).sort((a,b)=>b.v-a.v);
+  const RL=9;
+  const bar=(w,c)=>`<span class="sl-bar"><i style="width:${Math.max(0,Math.min(100,w))}%;background:${c}"></i></span>`;
+  let rg=regs.slice(0,RL).map((x,i)=>`<div class="sl-rb"><span>${i+1}. ${esc(x.r)}</span>${bar(x.v,gradeOf(x.v).color==='#7dd3fc'?'#38B2E6':gradeOf(x.v).color)}<small>${x.c} TS</small><b>${x.v.toFixed(1)}%</b></div>`).join('');
+  if(!regs.length)rg='<div class="sl-none">No grades yet.</div>';
+  const regTitle=reg?`Region: ${esc(reg)}`:'Region ranking';
+  const regSub=regs.length>RL?`Top ${RL} of ${regs.length}, by average score`:'Average final score';
+
+  // KPI and BU
+  const kb=KPIS.map(k=>{const a=avg(graded.map(x=>x.c.scores[k.key]).filter(s=>s!=null));return `<div class="sl-rb" style="grid-template-columns:114px 1fr 0 38px"><span>${esc(k.short)}</span>${bar(a==null?0:a*100,'#14B8AA')}<small></small><b>${a==null?'—':Math.round(a*100)+'%'}</b></div>`}).join('');
+  const bb=BUS.map(b=>{let q=0,d=0;graded.forEach(x=>{const y=(x.r.bu||{})[b]||{};q+=n(y.required);d+=Math.min(buDone(y),n(y.required))});const r=q?d/q:null;
+    return `<div class="sl-rb" style="grid-template-columns:34px 1fr 64px 40px"><span>${b}</span>${bar(r==null?0:r*100,'#2F57C9')}<small>${fmtN(d)}/${fmtN(q)}</small><b>${r==null?'—':Math.round(r*100)+'%'}</b></div>`}).join('');
+
+  // grade distribution
+  const gs=[...S.grades].sort((a,b)=>b.min-a.min),N=graded.length;
+  const gcnt=gs.map(g=>({g,c:graded.filter(x=>x.c.grade.label===g.label).length}));
+  const stk=N?`<div class="sl-stack" style="height:24px;margin:4px 0 6px">${gcnt.filter(x=>x.c).map(x=>`<i style="width:${x.c/N*100}%;background:${x.g.color};color:#10232C">${x.c/N>=.07?x.c:''}</i>`).join('')}</div>
+    <div class="sl-stk-l" style="gap:4px 10px;font-size:12px">${gcnt.filter(x=>x.c).map(x=>`<span><i style="background:${x.g.color}"></i>${esc(x.g.label)} <b>${x.c}</b></span>`).join('')}</div>`:'<div class="sl-none">No grades yet.</div>';
+
+  const d=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  const scope=reg?`Scope: ${reg}`:'Scope: all regions';
+  $('slide').innerHTML=`
+    <div class="sl-head"><div><h1>TS POSM KPI Grading</h1><p>${esc(reg||'All regions')} · ${esc(lastPullText())}</p></div>
+      <div class="when"><b>RMAS KPI report</b>Prepared ${d}</div></div>
+    <div class="sl-kpis">${kpis}</div>
+    <div class="sl-body" style="grid-template-columns:1.12fr 1fr">
+      <div class="sl-left">
+        <div class="sl-box"><h3>${slideMode==='top'?'Top Trade Supervisors':'Lowest-scoring Trade Supervisors'}<span>${slideMode==='top'?`Top ${pick.length} of ${N} graded`:`Bottom ${pick.length} of ${N} graded, lowest first`}</span></h3>${rt}</div>
+        <div class="sl-box"><h3>Needs coaching<span>Below 80%, rated Poor, or grade disputed</span></h3>${co}</div>
+      </div>
+      <div class="sl-right" style="grid-template-rows:1fr auto auto">
+        <div class="sl-box"><h3>${regTitle}<span>${regSub}</span></h3>${rg}</div>
+        <div class="sl-pair">
+          <div class="sl-box"><h3>Average per KPI</h3>${kb}</div>
+          <div class="sl-box"><h3>Deployment per BU</h3>${bb}</div>
+        </div>
+        <div class="sl-box"><h3>Grade distribution<span>${N} TS graded</span></h3>${stk}</div>
+      </div>
+    </div>
+    <div class="sl-foot"><span>${esc(scope)}. Weights: ${KPIS.map(k=>`${k.short} ${S.weights[k.key]}%`).join(', ')}.${partN?' * Partial grade: some KPIs not encoded yet.':''}</span>
+      <span class="lg">KPI cells:<i style="background:var(--ok)"></i>90%+<i style="background:var(--warn)"></i>80–89%<i style="background:var(--bad)"></i>below 80%</span></div>`;
+  fitSlide();
+}
+const fmtN=v=>Number(v||0).toLocaleString('en-US');
+function fitSlide(){
+  const st=$("slideStage"),fit=$("slideFit"),sl=$("slide");
+  const w=Math.max(280,st.clientWidth-32), sc=Math.min(1,w/1280);
+  sl.style.transform=`scale(${sc})`;fit.style.width=1280*sc+"px";fit.style.height=720*sc+"px";
+}
+window.addEventListener("resize",()=>{if($("slideDlg").open)fitSlide();});
+$("slideBtn").onclick=()=>{$("slideDlg").showModal();buildSlide();};
+$("slideClose").onclick=()=>$("slideDlg").close();
+document.querySelectorAll("#slideSeg button").forEach(b=>b.onclick=()=>{slideMode=b.dataset.g;document.querySelectorAll("#slideSeg button").forEach(x=>x.setAttribute("aria-pressed",x===b));buildSlide();});
+
+async function slideBlob(){
+  if(typeof html2canvas==="undefined")throw new Error("noh2c");
+  if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+  const host=document.createElement("div");host.style.cssText="position:fixed;left:0;top:0;width:1280px;height:720px;z-index:-1;pointer-events:none";
+  const cl=$("slide").cloneNode(true);cl.removeAttribute("id");cl.style.transform="none";host.appendChild(cl);document.body.appendChild(host);
+  try{const cv=await html2canvas(cl,{scale:2,backgroundColor:"#EEF2F1",logging:false,useCORS:true,width:1280,height:720,windowWidth:1280,windowHeight:720,scrollX:0,scrollY:0});
+    return await new Promise(r=>cv.toBlob(r,"image/png"));}
+  finally{host.remove();}
+}
+function slideName(){return "ts_posm_kpi_slide_"+new Date().toISOString().slice(0,10)+".png";}
+async function withBusy(btn,fn){btn.disabled=true;const t=btn.textContent;btn.textContent="Preparing…";try{await fn();}finally{btn.disabled=false;btn.textContent=t;}}
+$("slidePng").onclick=()=>withBusy($("slidePng"),async()=>{
+  let blob;try{blob=await slideBlob();}catch(e){toast("Could not render the image. Use Print or save PDF instead.");return;}
+  const filename=slideName();
+  try{const dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;if(dl){await dl.save({filename,data:blob});toast("Slide downloaded");return;}}
+  catch(err){if(err&&err.code==="declined")return;}
+  try{const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);toast("Slide downloaded");}
+  catch(e){toast("Download is not available in this view. Use Copy image instead.");}
+});
+$("slideCopy").onclick=()=>withBusy($("slideCopy"),async()=>{
+  try{if(!navigator.clipboard||typeof ClipboardItem==="undefined")throw 0;
+    await navigator.clipboard.write([new ClipboardItem({"image/png":slideBlob()})]);toast("Slide copied. Paste it into PowerPoint or your email.");}
+  catch(e){toast("This browser blocked copying. Use Download PNG instead.");}
+});
+$("slidePrint").onclick=()=>{
+  const h=$("printHost");h.innerHTML="";const cl=$("slide").cloneNode(true);cl.removeAttribute("id");h.appendChild(cl);
+  $("slideDlg").close();document.body.classList.add("printing");
+  const done=()=>{document.body.classList.remove("printing");h.innerHTML="";window.removeEventListener("afterprint",done);};
+  window.addEventListener("afterprint",done);setTimeout(()=>window.print(),50);
+};
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('slideDlg').open)$('slideDlg').close()});
 
 /* =====================================================================
    BOOT
