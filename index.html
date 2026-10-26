@@ -335,7 +335,7 @@ const CONFIG={
 /* =====================================================================
    CONFIG
    ===================================================================== */
-const STORE_KEY='rmas_ts_posm_kpi_v4', OLD_KEY='rmas_ts_posm_kpi_v3', ROLE_KEY='rmas_kpi_role', URL_KEY='rmas_kpi_sheet_url';
+const STORE_KEY='rmas_ts_posm_kpi_v4', OLD_KEY='rmas_ts_posm_kpi_v3', ROLE_KEY='rmas_kpi_role', URL_KEY='rmas_kpi_sheet_url', PW_KEY='rmas_kpi_admin_pw', VKEY_KEY='rmas_kpi_view_key';
 const BUS=['AV','HA','AC'];
 const BU_FIELDS=[['required','Target deployments'],['complete','Complete'],['fullDep','Incomplete – Full Dep. (no stock)']];
 const BU_SHORT={required:'Target',complete:'Complete',fullDep:'Inc. Full Dep.',delivered:'Request delivered qty'};
@@ -535,10 +535,15 @@ const TIPS={
 /* =====================================================================
    STATE
    ===================================================================== */
-let S, role=lsGet(ROLE_KEY)==='admin'?'admin':'viewer', sheetUrl=CONFIG.KPI_SHEET_URL||lsGet(URL_KEY)||'';
+/* ---- Access (checked on the server): Admin password, or the TS View Key from the link ?key=... ---- */
+let ADMIN_PW=lsGet(PW_KEY)||'', mustChange=false, noAccessShown=false;
+const VIEW_KEY=(()=>{let k='';try{k=(new URLSearchParams(location.search).get('key')||'').trim()}catch(e){}if(k)lsSet(VKEY_KEY,k);else k=lsGet(VKEY_KEY)||'';return k})();
+try{localStorage.removeItem(ROLE_KEY)}catch(e){}   // old browser-only admin flag — no longer trusted
+function creds(){return ADMIN_PW?{password:ADMIN_PW}:(VIEW_KEY?{key:VIEW_KEY}:{})}
+let S, role=ADMIN_PW?'admin':'viewer', sheetUrl=CONFIG.KPI_SHEET_URL||lsGet(URL_KEY)||'';
 function load(){try{const x=lsGet(STORE_KEY);if(x){const o=JSON.parse(x);if(o&&o.ts&&o.records)return o}}catch(e){}return null}
 function normalizeState(o){o.weights=o.weights||{...DEFAULT_WEIGHTS};o.grades=o.grades||DEFAULT_GRADES.map(g=>({...g}));
-  o.deductions=o.deductions||DEFAULT_DEDUCTIONS.map(d=>({...d}));o.adminPass=o.adminPass||'admin123';o.sources=Object.assign({inventoryUrl:'',autoPull:true,lastPull:null,deploymentUrl:'',depAutoPull:true,depLastPull:null},o.sources||{});o.sources.inventoryUrl='';o.sources.autoPull=false;if(CONFIG.DEPLOYMENT_URL)o.sources.deploymentUrl=CONFIG.DEPLOYMENT_URL;o.buMap=o.buMap||{};o.deleted=o.deleted||{};o.deletedTs=o.deletedTs||{};
+  o.deductions=o.deductions||DEFAULT_DEDUCTIONS.map(d=>({...d}));delete o.adminPass;o.sources=Object.assign({inventoryUrl:'',autoPull:true,lastPull:null,deploymentUrl:'',depAutoPull:true,depLastPull:null},o.sources||{});o.sources.inventoryUrl='';o.sources.autoPull=false;if(CONFIG.DEPLOYMENT_URL)o.sources.deploymentUrl=CONFIG.DEPLOYMENT_URL;o.buMap=o.buMap||{};o.deleted=o.deleted||{};o.deletedTs=o.deletedTs||{};
   // Convert old per-month keys ("2026-09|id") into date-range keys ("2026-09-01~2026-09-30|id")
   const now=new Date().toISOString();
   Object.keys(o.records).forEach(k=>{const i=k.indexOf('|'),m=k.slice(0,i),id=k.slice(i+1);if(!/^\d{4}-\d{2}$/.test(m))return;
@@ -549,7 +554,7 @@ function normalizeState(o){o.weights=o.weights||{...DEFAULT_WEIGHTS};o.grades=o.
   Object.entries(latest).forEach(([id,pk])=>{const lk=LIVE+'|'+id;if(o.records[lk]||o.deleted[lk])return;o.records[lk]=JSON.parse(JSON.stringify(o.records[pk+'|'+id]))});
   return o}
 /* ---- change stamping: every edit gets a timestamp so multi-device merges keep the newest version ---- */
-const SETTING_KEYS=['weights','grades','deductions','adminPass','sources','buMap'];
+const SETTING_KEYS=['weights','grades','deductions','sources','buMap'];
 const noUpd=o=>{const c=Object.assign({},o);delete c.updated;return JSON.stringify(c)};
 let lastSnap=null;
 function snap(){return {settings:JSON.stringify(SETTING_KEYS.map(k=>S[k])),ts:Object.fromEntries(S.ts.map(t=>[t.id,noUpd(t)])),rec:Object.fromEntries(Object.entries(S.records).map(([k,r])=>[k,noUpd(r)]))}}
@@ -564,7 +569,7 @@ function mergeState(a,b){
   if(!a||!a.records)return b;if(!b||!b.records)return a;
   const str=v=>String(v||'');const o={};
   const base=str(a.settingsUpdated)>=str(b.settingsUpdated)?a:b;
-  ['weights','grades','deductions','adminPass','sources','buMap','settingsUpdated'].forEach(function(k){o[k]=base[k]});
+  ['weights','grades','deductions','sources','buMap','settingsUpdated'].forEach(function(k){o[k]=base[k]});
   const tomb=function(x,y){const t=Object.assign({},x||{});Object.keys(y||{}).forEach(function(k){if(!t[k]||str(y[k])>str(t[k]))t[k]=y[k]});return t};
   o.deleted=tomb(a.deleted,b.deleted);o.deletedTs=tomb(a.deletedTs,b.deletedTs);
   o.records={};Object.keys(Object.assign({},a.records,b.records)).forEach(function(k){const x=a.records[k],y=b.records[k];
@@ -575,7 +580,7 @@ function mergeState(a,b){
 
 function emptyData(){return normalizeState({ts:[],records:{}})}
 // First run of v4: keep settings (weights, grades, deductions, password, connected tools) from the old version, drop the sample TS & grades.
-function migrate(){try{const x=lsGet(OLD_KEY);if(!x)return null;const o=JSON.parse(x);return normalizeState({ts:[],records:{},weights:o.weights,grades:o.grades,deductions:o.deductions,adminPass:o.adminPass,sources:o.sources})}catch(e){return null}}
+function migrate(){try{const x=lsGet(OLD_KEY);if(!x)return null;const o=JSON.parse(x);return normalizeState({ts:[],records:{},weights:o.weights,grades:o.grades,deductions:o.deductions,sources:o.sources})}catch(e){return null}}
 S=load()||migrate()||emptyData();normalizeState(S);lastSnap=snap();lsSet(STORE_KEY,JSON.stringify(S));
 
 /* =====================================================================
@@ -650,11 +655,20 @@ function applyRole(){
   $('nav').querySelectorAll('[data-admin]').forEach(b=>b.classList.toggle('hidden',!isAdmin()));$('refreshBtn').classList.toggle('hidden',!isAdmin());
   if(!isAdmin()&&['enc','imp','set'].includes(view))go('dash');else render();
 }
-$('roleBtn').onclick=()=>{if(isAdmin()){role='viewer';lsSet(ROLE_KEY,role);applyRole();toast('Logged out — viewer mode');return}
-  modal(`<h3 style="margin-top:0">Admin login</h3><p class="muted" style="font-size:12px">Admin can encode grades, import data, and change settings. Default password: <code>admin123</code> (change it in Settings).</p>
+$('roleBtn').onclick=()=>{if(isAdmin()){ADMIN_PW='';lsSet(PW_KEY,'');role='viewer';applyRole();toast('Logged out — viewer mode');pullRemote(false);return}
+  modal(`<h3 style="margin-top:0">Admin login</h3><p class="muted" style="font-size:12px">Admin can encode grades, import data, and change settings. The password is checked on the server.</p>
     <input type="password" id="mPass" placeholder="Password" style="width:100%"><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn sm" onclick="closeModal()">Cancel</button><button class="btn sm pri" id="mGo">Log in</button></div>`);
-  const go_=()=>{if($('mPass').value===S.adminPass){role='admin';lsSet(ROLE_KEY,role);closeModal();applyRole();toast('Admin mode')}else toast('Wrong password')};
+  const go_=async()=>{const pw=$('mPass').value;if(!pw)return;if(!sheetUrl)return toast('Admin login needs the Google Sheet connection');$('mGo').disabled=true;$('mGo').textContent='Checking…';
+    try{const j=await api('login',{password:pw});ADMIN_PW=pw;lsSet(PW_KEY,pw);role='admin';mustChange=!!j.mustChange;closeModal();applyRole();toast('Admin mode');await pullRemote(false);askPassChange()}
+    catch(e){toast(e.authError?'Wrong password':(e.message||'Could not reach the sheet'));if($('mGo')){$('mGo').disabled=false;$('mGo').textContent='Log in'}}};
   $('mGo').onclick=go_;$('mPass').onkeydown=e=>{if(e.key==='Enter')go_()};setTimeout(()=>$('mPass')&&$('mPass').focus(),50)};
+function askPassChange(){if(!isAdmin()||!mustChange)return;
+  modal(`<h3 style="margin-top:0">Please change the Admin password</h3><p style="font-size:13px">The old version of this tool kept the password where anyone with the link could read it. Set a new password now (at least 6 characters).</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn sm" onclick="closeModal()">Later</button><button class="btn sm pri" onclick="closeModal();go('set')">Change now</button></div>`)}
+function authLost(){ADMIN_PW='';lsSet(PW_KEY,'');role='viewer';applyRole();toast('Admin password was changed — please log in again')}
+function noAccess(){setSync('err','No access');S=emptyData();lastSnap=snap();lsSet(STORE_KEY,JSON.stringify(S));render();if(noAccessShown||$('modalHost').innerHTML)return;noAccessShown=true;
+  modal(`<h3 style="margin-top:0">This link is out of date</h3><p style="font-size:13px">Please open the latest TS KPI link from RMAS (it ends with <b>?key=…</b>). After opening it once, this device will remember it.</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn sm pri" onclick="closeModal()">OK</button></div>`)}
 function modal(html){$('modalHost').innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="box">${html}</div></div>`}
 function closeModal(){$('modalHost').innerHTML=''}
 function go(v){view=v;[...$('nav').children].forEach(x=>x.classList.toggle('active',x.dataset.v===v));
@@ -883,8 +897,12 @@ function renderCard(){
       <p class="muted" style="font-size:11px;margin-bottom:0">When RMAS changes a grade after acknowledgment, the status goes back to Pending.</p></div></div>
   </div>
   `;
-  const setAck=(status)=>{const cm=$('ackCmt').value.trim();if(status==='disputed'&&!cm)return toast('Please write the reason for the dispute');
-    S.records[cur.m+'|'+t.id].ack={status,comment:cm,at:new Date().toISOString()};save();renderCard();toast(status==='acknowledged'?'Grade acknowledged':'Dispute sent to RMAS')};
+  const setAck=async(status)=>{const cm=$('ackCmt').value.trim();if(status==='disputed'&&!cm)return toast('Please write the reason for the dispute');const rk=cur.m+'|'+t.id;
+    if(sheetUrl){$('ackOk').disabled=$('ackNo').disabled=true;
+      try{const j=await api('ack',Object.assign({rk,status,comment:cm},creds()));if(j.data){if(isAdmin())adopt(j.data);else useRemote(j.data)}}
+      catch(e){if(e.keyError)return noAccess();if(e.authError)authLost();if($('ackOk'))$('ackOk').disabled=$('ackNo').disabled=false;return toast(e.message||'Could not save — check the internet')}}
+    else{S.records[rk].ack={status,comment:cm,at:new Date().toISOString()};save()}
+    renderCard();toast(status==='acknowledged'?'Grade acknowledged':'Dispute sent to RMAS')};
   $('ackOk').onclick=()=>setAck('acknowledged');$('ackNo').onclick=()=>setAck('disputed');
   bindLockNow();
   if($('ackReset'))$('ackReset').onclick=()=>{delete S.records[cur.m+'|'+t.id].ack;save();renderCard();toast('Status reset to Pending')};
@@ -970,7 +988,7 @@ function renderImp(){
     <div class="row" style="margin-top:10px"><button class="btn sm" id="gPull" ${sheetUrl?'':'disabled'}>Pull now</button><button class="btn sm" id="gPush" ${sheetUrl?'':'disabled'}>Push now</button><button class="btn sm danger" id="gOff" ${sheetUrl&&!CONFIG.KPI_SHEET_URL?'':'disabled'}>Disconnect</button><span class="sync ${syncState.cls}" id="gStat">${syncState.txt}</span></div>
     <h3 style="margin-top:16px">Setup (one time, ~3 minutes)</h3>
     <ol class="steps"><li>Create a new Google Sheet, e.g. <b>RMAS TS POSM KPI DB</b>.</li><li>Extensions → Apps Script → delete the sample code, paste <b>Code.gs</b> (button below) → Save.</li>
-      <li>Deploy → New deployment → type <b>Web app</b> → Execute as <b>Me</b>, Who has access <b>Anyone</b> → Deploy → Authorize.</li><li>Copy the Web App URL (ends in <code>/exec</code>), paste it above, click <b>Connect</b>.</li>
+      <li>Deploy → New deployment → type <b>Web app</b> → Execute as <b>Me</b>, Who has access <b>Anyone</b> → Deploy → Authorize. (Updating later: Manage deployments → Edit → <b>New version</b>, so the URL stays the same.)</li><li>Copy the Web App URL (ends in <code>/exec</code>), paste it above, click <b>Connect</b>.</li>
       <li>The sheet gets a <b>KPI_DATA</b> tab (tool storage — don't edit) and a readable <b>GRADES</b> tab you can use for reports / pivot tables.</li></ol>
     <button class="btn sm" id="gCode">Download Code.gs</button>
    </div></div>`;
@@ -1151,7 +1169,7 @@ function getKpiData_() {
 `;
 let syncState={cls:'',txt:'Offline'},pushT=null;
 function setSync(cls,txt){syncState={cls,txt};$('syncStat').className='sync '+cls;$('syncStat').textContent=txt;if($('gStat')){$('gStat').className='sync '+cls;$('gStat').textContent=txt}}
-function schedulePush(){if(!sheetUrl)return;clearTimeout(pushT);setSync('','Saving…');pushT=setTimeout(()=>pushRemote(false),1200)}
+function schedulePush(){if(!sheetUrl||!isAdmin())return;clearTimeout(pushT);setSync('','Saving…');pushT=setTimeout(()=>pushRemote(false),1200)}
 function flatRows(only){const head=['Period','Status','Region','Agency','Trade Supervisor',...BU_PATHS.map(p=>p.split('.')[1]+' '+FIELD_LABEL[p.split('.')[2]]),...FLAT_KEYS.map(f=>FIELD_LABEL[f]),...KPIS.map(k=>k.short+' %'),'Weighted %','Deductions','Final %','Grade','Acknowledgment','TS Comment','Remarks','Last Updated'];
   const out=[head];const months=only||[LIVE,...lockedCycles().map(LOCK)];
   const all=[];months.forEach(m=>[...S.ts].filter(t=>!t.inactive||isLockedKey(m)).sort((a,b)=>a.region.localeCompare(b.region)||a.name.localeCompare(b.name)).forEach(t=>all.push([m+'|'+t.id,S.records[m+'|'+t.id]||null])));
@@ -1165,52 +1183,213 @@ function localAhead(R,L){const str=v=>String(v||'');if(str(L.settingsUpdated)>st
   if(Object.entries(L.records).some(([k,r])=>!R.records[k]||str(r.updated)>str(R.records[k].updated)))return true;
   const rt=Object.fromEntries((R.ts||[]).map(t=>[t.id,t]));if(L.ts.some(t=>!rt[t.id]||str(t.updated)>str(rt[t.id].updated)))return true;
   const d=(x,y)=>Object.keys(x||{}).some(k=>!(y||{})[k]);return d(L.deleted,R.deleted)||d(L.deletedTs,R.deletedTs)}
+async function api(action,payload){const res=await fetch(sheetUrl,{method:'POST',body:JSON.stringify(Object.assign({action},payload||{}))});const j=await res.json();
+  if(!j.ok){const e=new Error(j.error||'Server error');e.keyError=!!j.keyError;e.authError=!!j.authError;throw e}return j}
+// Viewer (TS): show exactly what the sheet has — a viewer never pushes changes.
+function useRemote(remote){const before=JSON.stringify(S);S=normalizeState(remote);lastSnap=snap();lsSet(STORE_KEY,JSON.stringify(S));
+  if(before!==JSON.stringify(S)){fillRegions();if(!$('modalHost').innerHTML)render()}}
 let pushing=false,pushAgain=false;
-async function pushRemote(manual){if(!sheetUrl)return;if(pushing){pushAgain=true;return}pushing=true;setSync('','Saving…');
-  try{const res=await fetch(sheetUrl,{method:'POST',body:JSON.stringify({action:'save',data:S,rows:flatRows()})});const j=await res.json();if(!j.ok)throw new Error(j.error||'Save failed');
+async function pushRemote(manual){if(!sheetUrl||!isAdmin())return;if(pushing){pushAgain=true;return}pushing=true;setSync('','Saving…');
+  try{const j=await api('save',{password:ADMIN_PW,data:S,rows:flatRows()});
     if(j.data)adopt(j.data);setSync('on','Synced '+nowT());if(manual)toast('Pushed to Google Sheets')}
-  catch(e){setSync('err','Sync error — will retry');if(manual)toast('Sync failed: '+e.message);clearTimeout(pushT);pushT=setTimeout(()=>pushRemote(false),30000)}
+  catch(e){if(e.authError){authLost();setSync('err','Not saved — log in again');return}
+    setSync('err','Sync error — will retry');if(manual)toast('Sync failed: '+e.message);clearTimeout(pushT);pushT=setTimeout(()=>pushRemote(false),30000)}
   finally{pushing=false;if(pushAgain){pushAgain=false;schedulePush()}}}
-async function pullRemote(manual){if(!sheetUrl)return;if(!manual&&pushing)return;setSync('','Loading…');
-  try{const res=await fetch(sheetUrl+(sheetUrl.includes('?')?'&':'?')+'action=load&t='+Date.now());const j=await res.json();if(!j.ok)throw new Error(j.error||'Load failed');
-    if(j.data&&j.data.ts&&j.data.records){const ahead=localAhead(j.data,S);adopt(j.data);remoteOk=true;fillPeriods();setSync('on','Synced '+nowT());if(manual)toast('Loaded latest data from Google Sheets');
-      if(ahead)schedulePush()} // this device had edits the sheet doesn't have yet (e.g. saved while offline)
-    else{remoteOk=true;setSync('on','Connected');await pushRemote(false);if(manual)toast('Connected — sheet was empty, uploaded current data')}}
-  catch(e){setSync('err','Offline — changes kept on this device');if(manual)toast('Could not reach the sheet: '+e.message)}}
+async function pullRemote(manual){if(!sheetUrl)return;if(!manual&&pushing)return;
+  const c=creds();if(!c.password&&!c.key)return noAccess();setSync('','Loading…');
+  try{const j=await api('load',c);
+    if(isAdmin()){mustChange=!!j.mustChange;
+      if(j.data&&j.data.ts&&j.data.records){const ahead=localAhead(j.data,S);adopt(j.data);remoteOk=true;fillPeriods();setSync('on','Synced '+nowT());if(manual)toast('Loaded latest data from Google Sheets');
+        if(ahead)schedulePush()} // this device had edits the sheet doesn't have yet (e.g. saved while offline)
+      else{remoteOk=true;setSync('on','Connected');await pushRemote(false);if(manual)toast('Connected — sheet was empty, uploaded current data')}}
+    else{if(j.data&&j.data.ts&&j.data.records)useRemote(j.data);remoteOk=true;fillPeriods();setSync('on','Synced '+nowT());if(manual)toast('Loaded latest data')}}
+  catch(e){if(e.keyError)return noAccess();if(e.authError){authLost();return pullRemote(false)}
+    setSync('err','Offline — changes kept on this device');if(manual)toast('Could not reach the sheet: '+e.message)}}
 // keep every open device fresh: pull when the tab comes back into view, and every 2 minutes while visible
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pullRemote(false)});
 setInterval(()=>{if(document.visibilityState==='visible')pullRemote(false)},120000);
 
 const CODE_GS=`/**
- * VaultSync — TS POSM KPI Grading backend (Google Apps Script)
- * Paste into Extensions > Apps Script of a Google Sheet, then
- * Deploy > New deployment > Web app (Execute as: Me, Access: Anyone).
+ * VaultSync — TS POSM KPI Grading backend (Google Apps Script) — SECURED VERSION
+ *
+ * What changed (security):
+ *  - The Admin password is checked HERE on the server, not in the browser.
+ *    It is stored only as a salted hash in Script Properties — never in the sheet data.
+ *  - Reading grades needs either the Admin password or the TS View Key
+ *    (the TS link looks like  .../VS-TS-GRADING/?key=kpi-xxxxxxxxxx).
+ *  - Saving grades and settings needs the Admin password.
+ *  - With the View Key, a TS can only acknowledge / dispute a grade — nothing else.
+ *
+ * First run: your current Admin password keeps working, but CHANGE IT in Settings right away,
+ * because the old version stored it where anyone could read it.
+ *
+ * Deploy: Deploy > Manage deployments > (pencil) Edit > Version: New version > Deploy.
+ * (Editing the existing deployment keeps the same /exec URL, so the page keeps working.)
+ * Access stays: Execute as Me, Who has access: Anyone.
  */
 const DATA_SHEET = 'KPI_DATA';   // tool storage (do not edit)
 const VIEW_SHEET = 'GRADES';     // readable table for reports
 const CHUNK = 40000;
+const MIN_PASS = 6;
+
+/* ============================== ENTRY POINTS ============================== */
 
 function doGet(e) {
-  try { return out_({ ok: true, data: load_() }); }
-  catch (err) { return out_({ ok: false, error: String(err) }); }
+  try {
+    const p = (e && e.parameter) || {};
+    setup_();
+    const who = auth_(p.key, null);
+    if (!who) return out_({ ok: false, error: 'No access key. Please open the latest link from RMAS (it ends with ?key=...).' });
+    return out_({ ok: true, data: strip_(load_()), isAdmin: false });
+  } catch (err) { return out_({ ok: false, error: String(err) }); }
 }
 
 function doPost(e) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  let body;
+  try { body = JSON.parse(e.postData.contents); }
+  catch (err) { return out_({ ok: false, error: 'Bad request' }); }
   try {
-    const body = JSON.parse(e.postData.contents);
-    if (body.action === 'save') {
-      // Merge with what other devices saved (newest edit wins per record / TS; deletions kept)
-      const merged = mergeState(load_(), body.data);
-      save_(merged);
-      if (body.rows) writeView_(body.rows);
-      return out_({ ok: true, savedAt: new Date().toISOString(), data: merged });
+    setup_();
+    const action = String(body.action || '');
+    const who = auth_(body.key, body.password);   // 'admin', 'viewer' or null
+
+    // Password given but wrong: slow down guessing, then refuse.
+    if (body.password && who !== 'admin') {
+      Utilities.sleep(1500);
+      return out_({ ok: false, error: 'Wrong admin password', authError: true });
     }
+
+    if (action === 'login') {
+      if (who !== 'admin') return out_({ ok: false, error: 'Wrong admin password', authError: true });
+      return out_({ ok: true, mustChange: mustChange_() });
+    }
+
+    if (!who) return out_({ ok: false, error: 'No access key. Please open the latest link from RMAS (it ends with ?key=...).', keyError: true });
+
+    if (action === 'load') {
+      return out_({ ok: true, data: strip_(load_()), isAdmin: who === 'admin', mustChange: who === 'admin' ? mustChange_() : false });
+    }
+
+    if (action === 'ack') return withLock_(function () { return ack_(body); });
+
+    // ---------- everything below is Admin only ----------
+    if (who !== 'admin') return out_({ ok: false, error: 'Admin only', authError: true });
+
+    if (action === 'save') {
+      return withLock_(function () {
+        const incoming = body.data || {};
+        delete incoming.adminPass;
+        const merged = mergeState(load_(), incoming);
+        delete merged.adminPass;
+        save_(merged);
+        if (Array.isArray(body.rows)) writeView_(body.rows);
+        return out_({ ok: true, savedAt: new Date().toISOString(), data: strip_(merged) });
+      });
+    }
+
+    if (action === 'changePassword') {
+      const np = String(body.newPassword || '');
+      if (np.length < MIN_PASS) return out_({ ok: false, error: 'Password must be at least ' + MIN_PASS + ' characters' });
+      if (/^admin\\d*$/i.test(np)) return out_({ ok: false, error: 'Please choose a less obvious password' });
+      setPass_(np);
+      PropertiesService.getScriptProperties().deleteProperty('PASS_TEMP');
+      return out_({ ok: true });
+    }
+
+    if (action === 'getViewKey') return out_({ ok: true, key: props_().getProperty('VIEW_KEY') });
+
+    if (action === 'newViewKey') {
+      const k = newKey_();
+      props_().setProperty('VIEW_KEY', k);
+      return out_({ ok: true, key: k });
+    }
+
     return out_({ ok: false, error: 'Unknown action' });
   } catch (err) {
     return out_({ ok: false, error: String(err) });
+  }
+}
+
+/* ============================== ACCESS ============================== */
+
+function props_() { return PropertiesService.getScriptProperties(); }
+
+// One-time setup: move the password out of the sheet data and create the TS View Key.
+function setup_() {
+  const p = props_();
+  if (p.getProperty('ADMIN_HASH') && p.getProperty('VIEW_KEY')) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (!p.getProperty('ADMIN_HASH')) {
+      const data = load_();
+      const current = (data && data.adminPass) ? String(data.adminPass) : 'admin123';
+      setPass_(current);
+      p.setProperty('PASS_TEMP', '1');             // old password was readable by anyone — must be changed
+      if (data && 'adminPass' in data) { delete data.adminPass; save_(data); }
+    }
+    if (!p.getProperty('VIEW_KEY')) p.setProperty('VIEW_KEY', newKey_());
   } finally { lock.releaseLock(); }
+}
+
+function auth_(key, password) {
+  const p = props_();
+  if (password) {
+    const salt = p.getProperty('ADMIN_SALT') || '';
+    if (hash_(salt + String(password)) === p.getProperty('ADMIN_HASH')) return 'admin';
+    return null;
+  }
+  if (key && String(key) === p.getProperty('VIEW_KEY')) return 'viewer';
+  return null;
+}
+
+function setPass_(pass) {
+  const salt = Utilities.getUuid();
+  props_().setProperties({ ADMIN_SALT: salt, ADMIN_HASH: hash_(salt + pass) });
+}
+
+function mustChange_() { return props_().getProperty('PASS_TEMP') === '1'; }
+
+function hash_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8)
+    .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+}
+
+function newKey_() {
+  return 'kpi-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
+}
+
+/* ============================== TS ACKNOWLEDGMENT ============================== */
+
+// A TS (View Key) can only set the acknowledgment of one existing grade.
+function ack_(body) {
+  const rk = String(body.rk || '');
+  const status = String(body.status || '');
+  const comment = String(body.comment || '').slice(0, 500);
+  if (status !== 'acknowledged' && status !== 'disputed') return out_({ ok: false, error: 'Invalid status' });
+  if (status === 'disputed' && !comment.trim()) return out_({ ok: false, error: 'Please write the reason for the dispute' });
+  const data = load_();
+  if (!data || !data.records || !data.records[rk]) return out_({ ok: false, error: 'Grade not found — please refresh the page' });
+  const now = new Date().toISOString();
+  data.records[rk].ack = { status: status, comment: comment, at: now };
+  data.records[rk].updated = now;
+  save_(data);
+  return out_({ ok: true, data: strip_(data) });
+}
+
+/* ============================== STORAGE ============================== */
+
+function withLock_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+
+function strip_(data) {
+  if (!data) return data;
+  const c = Object.assign({}, data);
+  delete c.adminPass;
+  return c;
 }
 
 function sheet_(name) {
@@ -1222,7 +1401,7 @@ function load_() {
   const sh = sheet_(DATA_SHEET);
   const n = sh.getLastRow();
   if (!n) return null;
-  const txt = sh.getRange(1, 1, n, 1).getValues().map(r => String(r[0]).slice(1)).join('');
+  const txt = sh.getRange(1, 1, n, 1).getValues().map(function (r) { return String(r[0]).slice(1); }).join('');
   return txt ? JSON.parse(txt) : null;
 }
 
@@ -1239,18 +1418,35 @@ function writeView_(rows) {
   const sh = sheet_(VIEW_SHEET);
   sh.clear();
   if (!rows.length) return;
-  const w = Math.max.apply(null, rows.map(r => r.length));
-  const data = rows.map(r => { const x = r.slice(); while (x.length < w) x.push(''); return x; });
+  const w = Math.max.apply(null, rows.map(function (r) { return r.length; }));
+  const data = rows.map(function (r) { const x = r.slice(); while (x.length < w) x.push(''); return x; });
   sh.getRange(1, 1, data.length, w).setValues(data);
   sh.getRange(1, 1, 1, w).setFontWeight('bold').setBackground('#0e2733').setFontColor('#ffffff');
   sh.setFrozenRows(1);
 }
 
-${mergeState.toString()}
+// Merge with what other devices saved (newest edit wins per record / TS; deletions kept)
+function mergeState(a, b) {
+  if (!a || !a.records) return b; if (!b || !b.records) return a;
+  const str = function (v) { return String(v || ''); }; const o = {};
+  const base = str(a.settingsUpdated) >= str(b.settingsUpdated) ? a : b;
+  ['weights', 'grades', 'deductions', 'sources', 'buMap', 'settingsUpdated'].forEach(function (k) { o[k] = base[k]; });
+  const tomb = function (x, y) { const t = Object.assign({}, x || {}); Object.keys(y || {}).forEach(function (k) { if (!t[k] || str(y[k]) > str(t[k])) t[k] = y[k]; }); return t; };
+  o.deleted = tomb(a.deleted, b.deleted); o.deletedTs = tomb(a.deletedTs, b.deletedTs);
+  o.records = {}; Object.keys(Object.assign({}, a.records, b.records)).forEach(function (k) {
+    const x = a.records[k], y = b.records[k];
+    const r = !x ? y : !y ? x : (str(x.updated) >= str(y.updated) ? x : y);
+    if (o.deleted[k] && str(o.deleted[k]) >= str(r.updated)) return; o.records[k] = r;
+  });
+  const m = {}; (a.ts || []).concat(b.ts || []).forEach(function (t) { const c = m[t.id]; if (!c || str(t.updated) > str(c.updated)) m[t.id] = t; });
+  o.ts = Object.keys(m).map(function (id) { return m[id]; }).filter(function (t) { return !(o.deletedTs[t.id] && str(o.deletedTs[t.id]) >= str(t.updated)); });
+  return o;
+}
 
 function out_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
+
 `;
 
 /* =====================================================================
@@ -1269,7 +1465,11 @@ function renderSet(){
      <div id="sDed">${S.deductions.map(d=>`<div class="row" style="margin:6px 0"><input data-dl="${d.id}" value="${esc(d.label)}" style="flex:1;min-width:150px"><input data-dp="${d.id}" type="number" min="0" value="${d.pts}" style="width:70px"><button class="btn sm danger" data-dx="${d.id}">×</button></div>`).join('')}</div>
      <div class="row" style="margin-top:8px"><button class="btn sm" id="sDAdd">+ Add deduction</button><button class="btn sm pri" id="sDSave">Save list</button></div>
      <h3 style="margin-top:20px">Admin password</h3>
+     ${mustChange?'<div class="flag red" style="margin-top:0">Please change the Admin password — the old one could be read by anyone with the link.</div>':''}
      <div class="row"><input type="password" id="sP1" placeholder="New password" style="flex:1;min-width:120px"><input type="password" id="sP2" placeholder="Confirm" style="flex:1;min-width:120px"><button class="btn sm pri" id="sPSave">Change</button></div>
+     <h3 style="margin-top:20px">TS link (view &amp; acknowledge)</h3>
+     <div class="row"><input id="sVLink" readonly placeholder="Loading…" style="flex:1;min-width:180px;font-size:12px"><button class="btn sm pri" id="sVCopy">Copy</button><button class="btn sm danger" id="sVNew">New key</button></div>
+     <p class="muted" style="font-size:11.5px">Send this link to the Trade Supervisors. Without the key in the link, nobody can open the grades. <b>New key</b> makes all old links stop working (use it if the link was shared outside the team).</p>
      <p class="muted" style="font-size:11.5px">Viewer mode (for TS) can see the dashboard and scorecards, and acknowledge/dispute grades. Only Admin can encode, import and change settings.</p></div></div>
   <div class="grid two mt">
    <div class="card"><h3>Trade Supervisors</h3>
@@ -1296,7 +1496,13 @@ function renderSet(){
   $('sDAdd').onclick=()=>{S.deductions=readDed();S.deductions.push({id:uid('d'),label:'New deduction',pts:1});renderSet()};
   $('sDSave').onclick=()=>{S.deductions=readDed().filter(d=>d.label);save();toast('Deduction list saved');renderSet()};
   document.querySelectorAll('[data-dx]').forEach(b=>b.onclick=()=>{S.deductions=readDed().filter(d=>d.id!==b.dataset.dx);renderSet();toast('Removed — click Save list to keep')});
-  $('sPSave').onclick=()=>{const a=$('sP1').value,b=$('sP2').value;if(a.length<4)return toast('At least 4 characters');if(a!==b)return toast('Passwords do not match');S.adminPass=a;save();$('sP1').value=$('sP2').value='';toast('Admin password changed')};
+  $('sPSave').onclick=async()=>{const a=$('sP1').value,b=$('sP2').value;if(a.length<6)return toast('At least 6 characters');if(a!==b)return toast('Passwords do not match');
+    try{await api('changePassword',{password:ADMIN_PW,newPassword:a});ADMIN_PW=a;lsSet(PW_KEY,a);mustChange=false;$('sP1').value=$('sP2').value='';toast('Admin password changed — use it on your other devices too');renderSet()}
+    catch(e){if(e.authError)return authLost();toast(e.message)}};
+  const vLink=k=>location.origin+location.pathname+'?key='+encodeURIComponent(k);
+  if(sheetUrl&&isAdmin())api('getViewKey',{password:ADMIN_PW}).then(j=>{if($('sVLink'))$('sVLink').value=vLink(j.key)}).catch(e=>{if($('sVLink'))$('sVLink').placeholder='Could not load: '+e.message});
+  $('sVCopy').onclick=()=>{const v=$('sVLink').value;if(!v)return;(navigator.clipboard?navigator.clipboard.writeText(v):Promise.reject()).then(()=>toast('TS link copied')).catch(()=>{$('sVLink').select();toast('Select and copy the link')})};
+  $('sVNew').onclick=()=>modalConfirm('Make a new TS key? All TS links sent before will stop working — you must send the new link to every TS.',async()=>{try{const j=await api('newViewKey',{password:ADMIN_PW});$('sVLink').value=vLink(j.key);toast('New TS link ready — send it to the TS')}catch(e){toast(e.message)}});
   $('sTsAdd').onclick=()=>{const name=$('sTsName').value.trim(),region=$('sTsRegion').value.trim(),agency=$('sTsAgency').value.trim().toUpperCase();if(!name||!region||!agency)return toast('Enter name, region and agency');
     const ex=findTs(name);if(ex&&!ex.inactive)return toast('TS already exists');if(ex){delete ex.inactive;ex.region=region;ex.agency=agency}else S.ts.push({id:uid(),name,region,agency});save();fillRegions();renderSet();toast('Trade Supervisor added')};
   $('sTsList').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;let rows;
