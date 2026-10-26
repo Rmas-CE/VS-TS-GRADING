@@ -960,7 +960,9 @@ function renderImp(){
     </tbody></table></div>
     <div style="margin-top:14px">
     <label class="muted" style="font-size:12px;display:block">Deployment KPI Tool (POSM KPI Command Center) — Apps Script Web App URL</label>
-    <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
+    <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"></div>
+    <label class="muted" style="font-size:12px;display:block;margin-top:8px">KPI feed key (Deployment Tracker › Setup › Access links) — saved on the server, not in this page</label>
+    <div class="row" style="margin-top:4px"><input id="depKey" type="password" autocomplete="off" placeholder="dtf-… (leave empty to keep the saved key)" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
     <div class="row" style="margin-top:10px">
       <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull deployment status now</button>
       <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="depAuto" ${src.depAutoPull?'checked':''}> Auto-pull when the tool opens and every 10 min (Admin)</label></div>
@@ -1004,10 +1006,10 @@ function renderImp(){
   $('gOff').onclick=()=>{sheetUrl='';lsSet(URL_KEY,'');setSync('','Offline');renderImp();toast('Disconnected — offline mode')};
   $('gCode').onclick=()=>download('Code.gs',CODE_GS,'text/plain');
   $('depSave').onclick=async()=>{S.sources.deploymentUrl=$('depUrl').value.trim();save();if(!S.sources.deploymentUrl){renderImp();return toast('Deployment KPI Tool disconnected')}
-    $('depRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
-    try{const d=await fetchDeployments();const ts=new Set(d.records.map(r=>r.ts.trim().toLowerCase()));renderImp();
+    const fk=$('depKey').value.trim();$('depRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
+    try{const d=fk?(await api('setDepSource',{password:ADMIN_PW,depUrl:S.sources.deploymentUrl,depKey:fk})).data:await fetchDeployments();const ts=new Set(d.records.map(r=>r.ts.trim().toLowerCase()));renderImp();
       $('depRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.records.length} store-BU deployment rows, ${ts.size} TS found.</div>`}
-    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Deployment KPI Tool: ${esc(e.message)}. Check that the URL ends in /exec and access is "Anyone".</div>`}};
+    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Deployment KPI Tool: ${esc(e.message)}. Check the URL (ends in /exec) and the KPI feed key.</div>`}};
   $('depPull').onclick=()=>pullDeployments(LIVE,true);
   $('pullAll').onclick=async()=>{await pullAllSources(LIVE,true);renderDiag()};renderDiag();
   $('depAuto').onchange=e=>{S.sources.depAutoPull=e.target.checked;save();toast(e.target.checked?'Auto-pull on':'Auto-pull off')};
@@ -1079,8 +1081,9 @@ async function syncTsFromInventory(manual){
     if($('invRes'))$('invRes').innerHTML=`<div class="flag green" style="margin-top:0">${msg}</div>`;if(manual)toast(msg)}
   catch(e){if(manual)toast('Sync failed: '+e.message)}}
 /* ---------- Deployment KPI Tool connector (POSM KPI Command Center) ---------- */
-async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw new Error('No Deployment KPI Tool URL');
-  const r=await fetch(u+(u.includes('?')?'&':'?')+'action=getAll&t='+Date.now());const d=await r.json();if(!d||d.ok===false||!Array.isArray(d.records))throw new Error(d&&d.error?d.error:'Unexpected response');
+// The Google Sheet backend pulls the Deployment Tracker with its secret feed key (never in this page).
+async function fetchDeployments(){if(!S.sources.deploymentUrl)throw new Error('No Deployment Tracker URL');if(!sheetUrl||!isAdmin())throw new Error('Admin login needed');
+  const j=await api('pullDep',{password:ADMIN_PW});const d=j.data;if(!d||!Array.isArray(d.records))throw new Error('Unexpected response');
   d.masterChanges=d.masterChanges||[];return d}
 let depUnknown=[];
 async function pullDeployments(m,manual,confirmed){
@@ -1219,6 +1222,9 @@ const CODE_GS=`/**
  *    (the TS link looks like  .../VS-TS-GRADING/?key=kpi-xxxxxxxxxx).
  *  - Saving grades and settings needs the Admin password.
  *  - With the View Key, a TS can only acknowledge / dispute a grade — nothing else.
+ *  - Deployment data is pulled HERE (server to server) from the Deployment Tracker with its secret
+ *    KPI feed key, so the key never appears in the public page. After updating, Apps Script may ask
+ *    you to Authorize again (new permission: connect to an external service) — allow it.
  *
  * First run: your current Admin password keeps working, but CHANGE IT in Settings right away,
  * because the old version stored it where anyone could read it.
@@ -1298,6 +1304,21 @@ function doPost(e) {
 
     if (action === 'getViewKey') return out_({ ok: true, key: props_().getProperty('VIEW_KEY') });
 
+    if (action === 'setDepSource') {
+      const url = String(body.depUrl || '').trim(), fk = String(body.depKey || '').trim();
+      if (!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[\\w-]+\\/exec$/.test(url)) return out_({ ok: false, error: 'The Deployment Tracker URL must be an Apps Script Web App URL ending in /exec' });
+      if (!/^dtf-[a-z0-9]{6,}$/i.test(fk)) return out_({ ok: false, error: 'The KPI feed key looks wrong — copy it from the Deployment Tracker (Setup › Access links)' });
+      const d = fetchDep_(url, fk);
+      props_().setProperties({ DEP_URL: url, DEP_KEY: fk });
+      return out_({ ok: true, data: d });
+    }
+    if (action === 'pullDep') {
+      const P = props_();
+      if (!P.getProperty('DEP_URL') || !P.getProperty('DEP_KEY')) return out_({ ok: false, error: 'Deployment Tracker not connected yet — paste its KPI feed key in Import & Sync' });
+      return out_({ ok: true, data: fetchDep_(P.getProperty('DEP_URL'), P.getProperty('DEP_KEY'), body.period) });
+    }
+    if (action === 'depStatus') return out_({ ok: true, connected: !!props_().getProperty('DEP_KEY') });
+
     if (action === 'newViewKey') {
       const k = newKey_();
       props_().setProperty('VIEW_KEY', k);
@@ -1357,6 +1378,21 @@ function hash_(s) {
 
 function newKey_() {
   return 'kpi-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
+}
+
+/* ============================== DEPLOYMENT TRACKER FEED ============================== */
+
+// Run this ONCE from the Apps Script editor (select "authorize" › Run) if Google asks for permission
+// to connect to an external service. It only checks that the Deployment Tracker can be reached.
+function authorize() { UrlFetchApp.fetch('https://script.google.com', { muteHttpExceptions: true }); return 'OK'; }
+
+function fetchDep_(url, key, period) {
+  const q = url + '?action=getAll&key=' + encodeURIComponent(key) + (/^\\d{4}-\\d{2}$/.test(String(period || '')) ? '&period=' + period : '');
+  const res = UrlFetchApp.fetch(q, { muteHttpExceptions: true, followRedirects: true });
+  let d;
+  try { d = JSON.parse(res.getContentText()); } catch (e) { throw new Error('Deployment Tracker did not answer (HTTP ' + res.getResponseCode() + ')'); }
+  if (!d || d.ok === false || !Array.isArray(d.records)) throw new Error('Deployment Tracker: ' + (d && d.error ? d.error : 'unexpected response'));
+  return d;
 }
 
 /* ============================== TS ACKNOWLEDGMENT ============================== */
