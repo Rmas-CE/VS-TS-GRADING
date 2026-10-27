@@ -329,7 +329,6 @@ ol.steps li{margin:4px 0}
    ===================================================================== */
 const CONFIG={
   KPI_SHEET_URL:'https://script.google.com/macros/s/AKfycbygdnoRRsnSS20w047MS2lNOjY9pqxCNb-ehatEEdriwgUdzlw_vXz5vDixwDCqupTc/exec',     // Web App URL of THIS tool's Google Sheet (Code.gs) — ends in /exec
-  INVENTORY_URL:'',     // Inventory Tool is no longer used for grading (Oct 2026)
   DEPLOYMENT_URL:'https://script.google.com/macros/s/AKfycbyqiLr5I2Cy0dQRdNxZenefc06ITJ4tduwpc6QB2mRglUbUMJvqElesO58W6kA9b3dXCQ/exec'     // POSM KPI Command Center / Deployment KPI Tool
 };
 /* =====================================================================
@@ -386,8 +385,6 @@ function monthToPeriod(ym){return ym+'-01~'+lastDay(ym)}
 function pStart(p){return String(p).split('~')[0]}
 function pEnd(p){const x=String(p).split('~');return x[1]||x[0]}
 function isFullMonth(p){const s=pStart(p),e=pEnd(p);return s.slice(8)==='01'&&s.slice(0,7)===e.slice(0,7)&&e===lastDay(s.slice(0,7))}
-function periodHasToday(p){const t=todayYmd();return pStart(p)<=t&&t<=pEnd(p)}
-function inPeriod(d,p){return !!d&&pStart(p)<=d&&d<=pEnd(p)}
 // Long label: "September 2026" (whole month) · "Sep 5, 2026" · "Sep 5 – Oct 4, 2026" · "Dec 15, 2025 – Jan 14, 2026"
 function monthLabel(p){p=String(p||'');if(p===LIVE)return 'Live data';if(/^\d{4}-\d{2}$/.test(p))p=monthToPeriod(p);if(!p.includes('-'))return p;
   const s=pDate(pStart(p)),e=pDate(pEnd(p));
@@ -396,15 +393,7 @@ function monthLabel(p){p=String(p||'');if(p===LIVE)return 'Live data';if(/^\d{4}
   if(pStart(p)===pEnd(p))return full(s);
   return s.getFullYear()===e.getFullYear()?md(s)+' – '+full(e):full(s)+' – '+full(e)}
 // Short label for chart axes / table headers
-function monthShort(p){p=String(p||'');if(/^\d{4}-\d{2}$/.test(p))p=monthToPeriod(p);const s=pDate(pStart(p)),e=pDate(pEnd(p));
-  if(isFullMonth(p))return s.toLocaleString('en',{month:'short'})+' '+String(s.getFullYear()).slice(2);
-  const md=d=>(d.getMonth()+1)+'/'+d.getDate();return pStart(p)===pEnd(p)?md(s):md(s)+'–'+md(e)}
 // Any date value → "YYYY-MM-DD" in local time ('' if unreadable)
-function dateOf(v){if(v===undefined||v===null||v==='')return '';if(v instanceof Date)return isNaN(v)?'':ymd(v);const s=String(v).trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(s)||/^\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(:\d{2})?$/.test(s))return s.slice(0,10);
-  const d=new Date(s);return isNaN(d)?'':ymd(d)}
-function periodKeys(){return [...new Set(Object.keys(S.records).map(k=>k.split('|')[0]))].sort()}
-function prevPeriod(p){return periodKeys().filter(x=>x<p).pop()||null}
 /* ---- Continuous (live) grading ----
    No month / date range: every TS has ONE live grade (key "LIVE|<tsId>") that is refreshed
    whenever data changes in the Deployment KPI Tool and Inventory Tool. */
@@ -679,7 +668,6 @@ function render(){({dash:renderDash,enc:renderEnc,card:renderCard,imp:renderImp,
 function tsOptions(){const list=filteredTs();if(!selTs||!list.some(t=>t.id===selTs))selTs=list[0]?.id||null;
   return list.map(t=>`<option value="${t.id}" ${t.id===selTs?'selected':''}>${esc(t.name)} — ${esc(t.region)} · ${esc(t.agency||'No agency')}</option>`).join('')}
 function openTs(id,v){selTs=id;go(v)}
-const agTag=t=>`<span class="tag" style="margin-left:4px">${esc(t.agency||'No agency')}</span>`;
 
 /* =====================================================================
    DASHBOARD
@@ -930,17 +918,9 @@ const COL_LABEL={month:'DATE',ts:'TRADE SUPERVISOR',bu:'BU',region:'REGION',stat
   repDue:'REPORTS DUE',repOnTime:'REPORTS ON TIME',repAccurate:'REPORTS ACCURATE',reported:'REPORTED WITH PROOF',comSent:'INSTRUCTIONS SENT',comResp:'RESPONDED WITHIN SLA',meetReq:'MEETINGS REQUIRED',meetAtt:'MEETINGS ATTENDED'};
 const BU_KEYS=BU_FIELDS.map(f=>f[0]);
 function statusKind(v){const h=normH(v);if(!h)return null;if(h.includes('FULL'))return 'fullDep';if(h.startsWith('INCOMPLETE')||h.startsWith('NOT')||h.startsWith('PENDING'))return 'incomplete';if(h.startsWith('COMPLETE')||h==='DONE'||h==='DEPLOYED')return 'complete';return 'incomplete'}
-const yes=v=>/^(y|yes|1|true|on ?time|ontime|✓|✔)$/i.test(String(v||'').trim());
 function normH(h){return String(h).toUpperCase().replace(/[^A-Z0-9]/g,'')}
 // Is a CSV date value inside the date range? true / false / null (unreadable).
 // Full dates are checked day by day; a month-only value ("2026-09", "Sep 2026") counts when that month overlaps the range.
-function rowInRange(v,p){v=String(v||'').trim();if(!v)return null;let x;
-  if((x=v.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/)))return inPeriod(x[1]+'-'+pad2(x[2])+'-'+pad2(x[3]),p);
-  if((x=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)))return inPeriod(x[3]+'-'+pad2(x[1])+'-'+pad2(x[2]),p);
-  let ym=null;if((x=v.match(/^(\d{4})[-\/](\d{1,2})$/)))ym=x[1]+'-'+pad2(x[2]);else if((x=v.match(/^(\d{1,2})\/(\d{4})$/)))ym=x[2]+'-'+pad2(x[1]);
-  else if(/^[A-Za-z]+\.?\s+\d{4}$/.test(v)){const d=new Date('1 '+v);if(!isNaN(d))ym=d.getFullYear()+'-'+pad2(d.getMonth()+1)}
-  if(ym)return ym+'-01'<=pEnd(p)&&lastDay(ym)>=pStart(p);
-  const d=dateOf(v);return d?inPeriod(d,p):null}
 // BU mapping: admin-defined map first (Import & Sync → Data check), then common Samsung CE names.
 function normBU(v){const raw=String(v||'').toUpperCase().trim();if(!raw)return null;if(BUS.includes(raw))return raw;
   const mp=(S.buMap||{})[raw];if(mp)return mp==='IGNORE'?null:mp;
@@ -960,9 +940,7 @@ function renderImp(){
     </tbody></table></div>
     <div style="margin-top:14px">
     <label class="muted" style="font-size:12px;display:block">Deployment KPI Tool (POSM KPI Command Center) — Apps Script Web App URL</label>
-    <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"></div>
-    <label class="muted" style="font-size:12px;display:block;margin-top:8px">KPI feed key (Deployment Tracker › Setup › Access links) — saved on the server, not in this page</label>
-    <div class="row" style="margin-top:4px"><input id="depKey" type="password" autocomplete="off" placeholder="dtf-… (leave empty to keep the saved key)" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
+    <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
     <div class="row" style="margin-top:10px">
       <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull deployment status now</button>
       <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="depAuto" ${src.depAutoPull?'checked':''}> Auto-pull when the tool opens and every 10 min (Admin)</label></div>
@@ -1006,10 +984,10 @@ function renderImp(){
   $('gOff').onclick=()=>{sheetUrl='';lsSet(URL_KEY,'');setSync('','Offline');renderImp();toast('Disconnected — offline mode')};
   $('gCode').onclick=()=>download('Code.gs',CODE_GS,'text/plain');
   $('depSave').onclick=async()=>{S.sources.deploymentUrl=$('depUrl').value.trim();save();if(!S.sources.deploymentUrl){renderImp();return toast('Deployment KPI Tool disconnected')}
-    const fk=$('depKey').value.trim();$('depRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
-    try{const d=fk?(await api('setDepSource',{password:ADMIN_PW,depUrl:S.sources.deploymentUrl,depKey:fk})).data:await fetchDeployments();const ts=new Set(d.records.map(r=>r.ts.trim().toLowerCase()));renderImp();
+    $('depRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
+    try{const d=await fetchDeployments();const ts=new Set(d.records.map(r=>r.ts.trim().toLowerCase()));renderImp();
       $('depRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.records.length} store-BU deployment rows, ${ts.size} TS found.</div>`}
-    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Deployment KPI Tool: ${esc(e.message)}. Check the URL (ends in /exec) and the KPI feed key.</div>`}};
+    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Deployment KPI Tool: ${esc(e.message)}. Check that the URL ends in /exec and the Deployment Tracker has the latest Code.gs.</div>`}};
   $('depPull').onclick=()=>pullDeployments(LIVE,true);
   $('pullAll').onclick=async()=>{await pullAllSources(LIVE,true);renderDiag()};renderDiag();
   $('depAuto').onchange=e=>{S.sources.depAutoPull=e.target.checked;save();toast(e.target.checked?'Auto-pull on':'Auto-pull off')};
@@ -1044,46 +1022,9 @@ function applyImport(){if(!pending)return;const res=applyGroups(pending.list,pen
 const DIAG={},TSC={};
 const tally=(o,k)=>{k=String(k===undefined||k===null||k===''?'(blank)':k);o[k]=(o[k]||0)+1};
 function newDiag(src,m){return DIAG[src]={src,month:m,at:new Date(),read:0,used:0,skip:{},badBU:{},status:{},months:{},note:''}}
-/* ---------- Inventory Tool connector ---------- */
-async function fetchInventory(m){const u=S.sources.inventoryUrl;if(!u)throw new Error('No Inventory Tool URL');const q=u.includes('?')?'&':'?';
-  let d=null,lite=false;
-  try{const r=await fetch(u+q+'action=getKpiData&t='+Date.now());const j=await r.json();if(j&&Array.isArray(j.requests)&&!j.error){d=j;lite=true}}catch(e){}
-  if(!d){const r=await fetch(u+q+'action=getData&t='+Date.now());d=await r.json();if(!d||!Array.isArray(d.requests))throw new Error(d&&d.error?d.error:'Unexpected response')}
-  d.tradeSupervisors=d.tradeSupervisors||[];d.posmMaster=d.posmMaster||[];d.lite=lite;return d}
-function monthOf(v){if(!v)return '';const s=String(v);if(/^\d{4}-\d{2}/.test(s))return s.slice(0,7);const d=new Date(s);return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
-async function pullInventory(m,manual){
-  if(!S.sources.inventoryUrl)return;const box=$('invRes');if(box)box.innerHTML='<div class="flag blue" style="margin-top:0">Pulling from Inventory Tool…</div>';
-  try{const d=await fetchInventory(m);
-    const tsById={};d.tradeSupervisors.forEach(t=>tsById[String(t.id)]=t);
-    const buByCode={};d.posmMaster.forEach(p=>buByCode[String(p.code)]=normBU(p.bu));
-    const D=newDiag('inv',m);D.read=d.requests.length;const rawBu={};d.posmMaster.forEach(p=>rawBu[String(p.code)]=p.bu);
-    d.requests.forEach(r=>{tally(D.status,r.status);if(String(r.status).toLowerCase()==='delivered')tally(D.months,monthOf(r.dateDelivered)||'(no date)')});
-    if(!d.lite&&d.requests.length>=1000)D.note='Only the latest 1,000 requests were returned by getData — install the Inventory add-on to read all of them.';
-    const del=d.requests.filter(r=>{if(String(r.status).toLowerCase()!=='delivered'){tally(D.skip,'status not Delivered');return false}return true});
-    const groups={};let noBU=0;
-    del.forEach(r=>{const tsRec=tsById[String(r.ts)];const name=String(tsRec?tsRec.name:r.ts||'').trim();if(!name){tally(D.skip,'no Trade Supervisor');return}const bu=buByCode[String(r.posmCode)];
-      if(!bu){noBU++;tally(D.skip,'BU not recognized');tally(D.badBU,rawBu[String(r.posmCode)]===undefined?'(POSM code not in master: '+r.posmCode+')':rawBu[String(r.posmCode)]);return}D.used++;
-      const g=groups[nameKey(name)]=groups[nameKey(name)]||{m,name,region:tsRec?tsRec.region:'',vals:{}};const p=`bu.${bu}.delivered`;g.vals[p]=(g.vals[p]||0)+n(r.qty)});
-    // TS with no deliveries but active in Inventory → Delivered = 0 is NOT written (unknown vs zero), so we only fill who had deliveries
-    const res=applyGroups(Object.values(groups),'Inventory Tool',{respectManual:true,addNew:true});
-    const partial=!d.lite&&d.requests.length>=1000;
-    const summary=`${del.length} delivered request line(s) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in KPI list (${res.skipped.slice(0,3).map(esc).join(', ')}${res.skip>3?'…':''})`:''}${noBU?`, ${noBU} line(s) with unknown BU`:''}${partial?' · ⚠ only latest 1,000 requests read — install the add-on':''}`;
-    S.sources.lastPull={month:m,at:new Date().toISOString(),summary};save();
-    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU||partial?'':'green'}" style="margin-top:0">Inventory Tool: ${summary}.${res.skip?' Use <b>Sync TS list</b> to add missing TS.':''}</div>`;
-    if(manual)toast('Pulled from Inventory Tool');renderDiag();if(!BG&&view!=='imp')render();return res}
-  catch(e){if(box)box.innerHTML=`<div class="flag red" style="margin-top:0">Pull failed: ${esc(e.message)}</div>`;if(manual)toast('Pull failed: '+e.message)}}
-async function syncTsFromInventory(manual){
-  try{const d=await fetchInventory(LIVE);let add=0,reg=0;
-    TSC.inv={total:d.tradeSupervisors.length,active:d.tradeSupervisors.filter(t=>(t.status||'active')==='active').length,inactive:d.tradeSupervisors.filter(t=>(t.status||'active')!=='active').map(t=>t.name+' ('+t.status+')')};
-    d.tradeSupervisors.filter(t=>(t.status||'active')==='active'&&String(t.name||'').trim()).forEach(t=>{const name=String(t.name).trim();const ex=findTs(name);
-      if(!ex){S.ts.push({id:uid(),name,region:String(t.region||'Unassigned').trim()||'Unassigned'});add++}else if(t.region&&ex.region!==t.region){ex.region=String(t.region).trim();reg++}});
-    save();fillRegions();const msg=`TS list synced: ${add} added${reg?`, ${reg} region(s) updated`:''}. KPI tool now has ${S.ts.length} TS.`;
-    if($('invRes'))$('invRes').innerHTML=`<div class="flag green" style="margin-top:0">${msg}</div>`;if(manual)toast(msg)}
-  catch(e){if(manual)toast('Sync failed: '+e.message)}}
 /* ---------- Deployment KPI Tool connector (POSM KPI Command Center) ---------- */
-// The Google Sheet backend pulls the Deployment Tracker with its secret feed key (never in this page).
-async function fetchDeployments(){if(!S.sources.deploymentUrl)throw new Error('No Deployment Tracker URL');if(!sheetUrl||!isAdmin())throw new Error('Admin login needed');
-  const j=await api('pullDep',{password:ADMIN_PW});const d=j.data;if(!d||!Array.isArray(d.records))throw new Error('Unexpected response');
+async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw new Error('No Deployment Tracker URL');
+  const r=await fetch(u+(u.includes('?')?'&':'?')+'action=getAll&t='+Date.now());const d=await r.json();if(!d||d.ok===false||!Array.isArray(d.records))throw new Error(d&&d.error?d.error:'Unexpected response');
   d.masterChanges=d.masterChanges||[];return d}
 let depUnknown=[];
 async function pullDeployments(m,manual,confirmed){
@@ -1147,29 +1088,6 @@ function applyGroups(list,srcName,opt={}){let upd=0,added=0,skip=0,reack=0,kept=
     if(opt.extra&&opt.extra(r,x))changed=true;
     if(!changed)return;if(r.ack&&sig(r)!==before){delete r.ack;reack++}r.updated=new Date().toISOString();S.records[k]=r;upd++});
   return {upd,added,skip,reack,kept,skipped}}
-const INV_ADDON=`/**
- * ADD-ON for the RMAS POSM Inventory Tool Code.gs — lets the TS POSM KPI tool
- * read ALL requests (getData only returns the latest 1,000).
- *
- * 1) In doGet(), add this line next to the other "if (action === ...)" lines:
- *
- *      if (action === 'getKpiData') return jsonOut_(getKpiData_());
- *
- * 2) Paste the function below anywhere in Code.gs.
- * 3) Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
- *    (Same URL — no need to change anything in the Inventory Tool.)
- */
-function getKpiData_() {
-  return {
-    requests: readTable_('requests')
-      .map(r => ({ id: r.id, posmCode: r.posmCode, qty: Number(r.qty) || 0, store: r.store, ts: r.ts, status: r.status,
-                   dateCreated: normalizeDateValue_(r.dateCreated), dateDelivered: normalizeDateValue_(r.dateDelivered), dueDate: normalizeDateValue_(r.dueDate) })),
-    posmMaster: readTable_('posm').map(r => ({ code: r.code, bu: r.bu })),
-    tradeSupervisors: readTable_('tradeSupervisors').map(r => ({ id: r.id, name: r.name, region: r.region, status: r.status || 'active' })),
-    stores: readTable_('stores').map(r => ({ id: r.id, name: r.name, tsId: r.tsId, region: r.region, status: r.status || 'active' }))
-  };
-}
-`;
 let syncState={cls:'',txt:'Offline'},pushT=null;
 function setSync(cls,txt){syncState={cls,txt};$('syncStat').className='sync '+cls;$('syncStat').textContent=txt;if($('gStat')){$('gStat').className='sync '+cls;$('gStat').textContent=txt}}
 function schedulePush(){if(!sheetUrl||!isAdmin())return;clearTimeout(pushT);setSync('','Saving…');pushT=setTimeout(()=>pushRemote(false),1200)}
@@ -1222,9 +1140,6 @@ const CODE_GS=`/**
  *    (the TS link looks like  .../VS-TS-GRADING/?key=kpi-xxxxxxxxxx).
  *  - Saving grades and settings needs the Admin password.
  *  - With the View Key, a TS can only acknowledge / dispute a grade — nothing else.
- *  - Deployment data is pulled HERE (server to server) from the Deployment Tracker with its secret
- *    KPI feed key, so the key never appears in the public page. After updating, Apps Script may ask
- *    you to Authorize again (new permission: connect to an external service) — allow it.
  *
  * First run: your current Admin password keeps working, but CHANGE IT in Settings right away,
  * because the old version stored it where anyone could read it.
@@ -1304,21 +1219,6 @@ function doPost(e) {
 
     if (action === 'getViewKey') return out_({ ok: true, key: props_().getProperty('VIEW_KEY') });
 
-    if (action === 'setDepSource') {
-      const url = String(body.depUrl || '').trim(), fk = String(body.depKey || '').trim();
-      if (!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[\\w-]+\\/exec$/.test(url)) return out_({ ok: false, error: 'The Deployment Tracker URL must be an Apps Script Web App URL ending in /exec' });
-      if (!/^dtf-[a-z0-9]{6,}$/i.test(fk)) return out_({ ok: false, error: 'The KPI feed key looks wrong — copy it from the Deployment Tracker (Setup › Access links)' });
-      const d = fetchDep_(url, fk);
-      props_().setProperties({ DEP_URL: url, DEP_KEY: fk });
-      return out_({ ok: true, data: d });
-    }
-    if (action === 'pullDep') {
-      const P = props_();
-      if (!P.getProperty('DEP_URL') || !P.getProperty('DEP_KEY')) return out_({ ok: false, error: 'Deployment Tracker not connected yet — paste its KPI feed key in Import & Sync' });
-      return out_({ ok: true, data: fetchDep_(P.getProperty('DEP_URL'), P.getProperty('DEP_KEY'), body.period) });
-    }
-    if (action === 'depStatus') return out_({ ok: true, connected: !!props_().getProperty('DEP_KEY') });
-
     if (action === 'newViewKey') {
       const k = newKey_();
       props_().setProperty('VIEW_KEY', k);
@@ -1378,21 +1278,6 @@ function hash_(s) {
 
 function newKey_() {
   return 'kpi-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
-}
-
-/* ============================== DEPLOYMENT TRACKER FEED ============================== */
-
-// Run this ONCE from the Apps Script editor (select "authorize" › Run) if Google asks for permission
-// to connect to an external service. It only checks that the Deployment Tracker can be reached.
-function authorize() { UrlFetchApp.fetch('https://script.google.com', { muteHttpExceptions: true }); return 'OK'; }
-
-function fetchDep_(url, key, period) {
-  const q = url + '?action=getAll&key=' + encodeURIComponent(key) + (/^\\d{4}-\\d{2}$/.test(String(period || '')) ? '&period=' + period : '');
-  const res = UrlFetchApp.fetch(q, { muteHttpExceptions: true, followRedirects: true });
-  let d;
-  try { d = JSON.parse(res.getContentText()); } catch (e) { throw new Error('Deployment Tracker did not answer (HTTP ' + res.getResponseCode() + ')'); }
-  if (!d || d.ok === false || !Array.isArray(d.records)) throw new Error('Deployment Tracker: ' + (d && d.error ? d.error : 'unexpected response'));
-  return d;
 }
 
 /* ============================== TS ACKNOWLEDGMENT ============================== */
