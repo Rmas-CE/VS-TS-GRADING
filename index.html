@@ -1054,7 +1054,10 @@ function newDiag(src,m){return DIAG[src]={src,month:m,at:new Date(),read:0,used:
    Incomplete → not credited · CTN/EOL and "No display" → not scored. */
 const EXEC_ST={C:'Complete',N:'No POSM Stock',I:'Incomplete'};
 const manilaYmd=at=>{const t=Date.parse(at);return isNaN(t)?'':new Date(t+8*3600e3).toISOString().slice(0,10)};
-function execWindow(){const ym=workCycle();return {ym,from:cycleStart(ym),to:cycleEnd(ym)}}
+// Execution data window = the open grade period. Exception: November 2026 also takes Nov 3–7 (Execution check
+// started Nov 3, after October was already graded from the Deployment Tracker).
+const EXEC_FROM_OVERRIDE={'2026-11':'2026-11-03'};
+function execWindow(){const ym=workCycle();return {ym,from:EXEC_FROM_OVERRIDE[ym]||cycleStart(ym),to:cycleEnd(ym)}}
 async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw new Error('No POSM Execution URL');
   const r=await fetch(u+(u.includes('?')?'&':'?')+'t='+Date.now());const d=await r.json();if(!d||d.ok===false||!Array.isArray(d.reports))throw new Error(d&&d.error?d.error:'Unexpected response from the Execution dashboard');
   const W=execWindow();const inWin=d.reports.filter(x=>{const y=manilaYmd(x.at);return y&&y>=W.from&&y<=W.to});
