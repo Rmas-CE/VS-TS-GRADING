@@ -277,7 +277,7 @@ ol.steps li{margin:4px 0}
       <label for="gPeriod">Period</label>
       <select id="gPeriod"></select>
       <span class="sync" id="syncStat">Offline</span>
-      <button class="btn sm hidden" id="refreshBtn" title="Pull the latest data from the Deployment KPI Tool">Refresh data</button>
+      <button class="btn sm hidden" id="refreshBtn" title="Pull the latest deployment data from the POSM Execution dashboard">Refresh data</button>
       <button class="btn sm" id="slideBtn">Report slide</button>
       <button class="btn sm" id="roleBtn"></button>
     </div>
@@ -329,15 +329,15 @@ ol.steps li{margin:4px 0}
    ===================================================================== */
 const CONFIG={
   KPI_SHEET_URL:'https://script.google.com/macros/s/AKfycbygdnoRRsnSS20w047MS2lNOjY9pqxCNb-ehatEEdriwgUdzlw_vXz5vDixwDCqupTc/exec',     // Web App URL of THIS tool's Google Sheet (Code.gs) — ends in /exec
-  DEPLOYMENT_URL:'https://script.google.com/macros/s/AKfycbyqiLr5I2Cy0dQRdNxZenefc06ITJ4tduwpc6QB2mRglUbUMJvqElesO58W6kA9b3dXCQ/exec'     // POSM KPI Command Center / Deployment KPI Tool
+  DEPLOYMENT_URL:'https://script.google.com/macros/s/AKfycbzxdJqnCQ4lxm_wyAl7anvhhQ-fgYDVdAXujSXgMC63dPt_Zpylz93dMfF5B0s7pnV5/exec'     // POSM Execution dashboard (IN-STORE-POSM-CHECKING) — TS execution check reports
 };
 /* =====================================================================
    CONFIG
    ===================================================================== */
 const STORE_KEY='rmas_ts_posm_kpi_v4', OLD_KEY='rmas_ts_posm_kpi_v3', ROLE_KEY='rmas_kpi_role', URL_KEY='rmas_kpi_sheet_url', PW_KEY='rmas_kpi_admin_pw', VKEY_KEY='rmas_kpi_view_key';
 const BUS=['AV','HA','AC'];
-const BU_FIELDS=[['required','Target deployments'],['complete','Complete'],['fullDep','Incomplete – Full Dep. (no stock)']];
-const BU_SHORT={required:'Target',complete:'Complete',fullDep:'Inc. Full Dep.',delivered:'Request delivered qty'};
+const BU_FIELDS=[['required','Target deployments'],['complete','Complete'],['fullDep','No POSM Stock (counted complete)']];
+const BU_SHORT={required:'Target',complete:'Complete',fullDep:'No POSM Stock',delivered:'Request delivered qty'};
 const DEFAULT_WEIGHTS={dep:40,rep:40,com:20};
 const DEFAULT_GRADES=[
   {min:95,label:'Outstanding',color:'#19d3c5'},{min:90,label:'Excellent',color:'#3fa9f5'},
@@ -495,7 +495,7 @@ function buRate(r,b){const x=(r.bu||{})[b]||{};return n(x.required)>0?clamp(Math
 
 const KPIS=[
  {key:'dep',name:'POSM Deployment Execution',short:'Deployment',
-  desc:'Deployment status per BU from the Deployment KPI Tool (Incomplete – Full Deployment = no available stock, counted as complete), checked against the POSM audit when available.',
+  desc:'POSM status per displayed model per BU from the TS POSM Execution check (latest answer per store in the grade period). No POSM Stock is counted as complete; CTN/EOL and No display are not scored. Checked against the POSM audit when available.',
   formula:'((Complete + Incomplete Full Dep.) × Audit verification rate) ÷ Target',
   calc:(r,a)=>{const p=[];if(a.required>0)p.push(clamp(Math.min(a.deployed,a.required)*verRate(r)/a.required));if(r.locked){const q=reqScore(r,a);if(q!=null)p.push(q)}return avg(p)}, // request deployment only inside grades locked before Oct 2026 (Inventory Tool)
   check:(r,a)=>{const e=[];BUS.forEach(b=>{const x=(r.bu||{})[b]||{};if(buDone(x)>n(x.required)&&has(x.required))e.push(`${b}: Complete + Incomplete Full Dep. cannot exceed Target.`)});
@@ -585,7 +585,7 @@ function compute(r){
   const errors=KPIS.flatMap(k=>k.check(r,a));
   const flags=[];
   if(a.required>0&&a.incomplete>0)flags.push(['',`${a.incomplete} of ${a.required} deployment(s) still Incomplete — not credited.`]);
-  if(a.fullDep>0)flags.push(['blue',`${a.fullDep} deployment(s) marked Incomplete – Full Deployment (no available POSM stock) — counted as complete.`]);
+  if(a.fullDep>0)flags.push(['blue',`${a.fullDep} model(s) marked No POSM Stock — counted as complete.`]);
   if(r.locked&&!r.reqVerify)flags.push(['blue',a.delivered>0?`Request deployment pending RMAS verification (${a.delivered} request POSM delivered).`:'No request POSM delivered — becomes 100% once RMAS verifies deployment is complete.']);
   if(r.locked&&r.reqVerify==='partial'&&a.delivered>n(r.reqDeployed))flags.push(['',`${a.delivered-n(r.reqDeployed)} of ${a.delivered} delivered request POSM not deployed.`]);
   if(n(r.auditStores)>0&&n(r.auditVerified)<n(r.auditStores))flags.push(['red',`Audit: only ${n(r.auditVerified)} of ${n(r.auditStores)} audited stores had actual display — deployment credit reduced to ${pct(verRate(r))}.`]);
@@ -685,7 +685,7 @@ function renderDash(){
   const regs=[...new Set(graded.map(x=>x.t.region))].map(r=>({r,v:avg(graded.filter(x=>x.t.region===r).map(x=>x.c.final)),c:graded.filter(x=>x.t.region===r).length})).sort((a,b)=>b.v-a.v);
   const buStats=BUS.map(b=>{let req=0,dep=0;graded.forEach(x=>{const y=(x.r.bu||{})[b]||{};req+=n(y.required);dep+=Math.min(buDone(y),n(y.required))});return {b,req,dep,rate:req?dep/req:null}});
   const gs=[...S.grades].sort((a,b)=>b.min-a.min);const cnt=gs.map(g=>graded.filter(x=>x.c.grade.label===g.label).length);const cm=Math.max(1,...cnt);
-  const repSum=graded.reduce((s,x)=>s+n(x.r.reported),0);const st=[['Target',sumA('required')],['Complete',sumA('complete')],['+ Inc. Full Dep.',sumA('deployed')],...(repSum?[['Reported w/ proof',repSum]]:[])];
+  const repSum=graded.reduce((s,x)=>s+n(x.r.reported),0);const st=[['Target',sumA('required')],['Complete',sumA('complete')],['+ No POSM Stock',sumA('deployed')],...(repSum?[['Reported w/ proof',repSum]]:[])];
   const ags=[...new Set(graded.map(x=>x.t.agency||'No agency'))].map(a=>{const g=graded.filter(x=>(x.t.agency||'No agency')===a);return {a,v:avg(g.map(x=>x.c.final)),c:g.length,tot:list.filter(t=>(t.agency||'No agency')===a).length,dep:(()=>{let q=0,d=0;g.forEach(x=>{q+=x.c.a.required;d+=Math.min(x.c.a.deployed,x.c.a.required)});return q?d/q:null})()}}).sort((a,b)=>b.v-a.v);
   const mx=Math.max(1,...st.map(s=>s[1]));
   const medal=['#eab308','#cbd5e1','#d08b4c'];
@@ -716,8 +716,8 @@ function renderDash(){
       <h3 style="margin-top:16px">Deployment rate per BU</h3>${buStats.map(x=>`<div class="kpibar"><div class="n">${x.b} <small>${x.dep}/${x.req}</small></div><div class="bar"><i style="width:${x.rate==null?0:x.rate*100}%"></i></div><div class="p">${pct(x.rate)}</div></div>`).join('')}</div>
     <div class="card"><h3>Deployment funnel (all TS)</h3><div class="funnel">${st.map(([l,v],i)=>`<div class="step"><div>${l}</div><div><div class="fb" style="width:${v/mx*100}%">${v.toLocaleString()}</div></div><div class="muted" style="text-align:right">${i?(st[0][1]?(v/st[0][1]*100).toFixed(1)+'%':'—'):'100%'}</div></div>`).join('')}</div>
       ${(()=>{const T=sumA('required');if(!T)return '';const c1=sumA('complete'),c2=sumA('fullDep'),c3=Math.max(0,T-c1-c2);return `<div style="display:flex;height:12px;border-radius:99px;overflow:hidden;margin-top:12px;border:1px solid var(--line)"><i style="width:${c1/T*100}%;background:#22c55e"></i><i style="width:${c2/T*100}%;background:#3fa9f5"></i><i style="width:${c3/T*100}%;background:#ef4444"></i></div>
-      <div class="row muted" style="font-size:11.5px;margin-top:6px;gap:12px"><span><b style="color:#22c55e">■</b> Complete ${c1}</span><span><b style="color:#3fa9f5">■</b> Inc. Full Dep. (no stock) ${c2}</span><span><b style="color:#ef4444">■</b> Incomplete ${c3}</span></div>`})()}
-      <p class="muted" style="font-size:12px;margin:8px 0 0">Incomplete – Full Deployment (no available stock) counts as complete.</p></div>
+      <div class="row muted" style="font-size:11.5px;margin-top:6px;gap:12px"><span><b style="color:#22c55e">■</b> Complete ${c1}</span><span><b style="color:#3fa9f5">■</b> No POSM Stock ${c2}</span><span><b style="color:#ef4444">■</b> Incomplete ${c3}</span></div>`})()}
+      <p class="muted" style="font-size:12px;margin:8px 0 0">No POSM Stock counts as complete. CTN/EOL and No display are not scored.</p></div>
     <div class="card"><h3>Grade distribution</h3>${gs.map((g,i)=>`<div class="kpibar" style="grid-template-columns:1.4fr 2fr 30px"><div class="n">${g.label}</div><div class="bar"><i style="width:${cnt[i]/cm*100}%;background:${g.color}"></i></div><div class="p">${cnt[i]}</div></div>`).join('')}</div>
   </div>
   <div class="card mt"><h3>Watchlist — needs coaching</h3>
@@ -769,7 +769,7 @@ function renderEnc(){
     <div class="tbl-wrap"><table class="butbl"><thead><tr><th>BU</th>${BU_FIELDS.map(f=>`<th class="num" style="white-space:normal;min-width:84px">${f[1]}</th>`).join('')}<th class="num">Incomplete</th><th class="num">Rate</th></tr></thead><tbody>
     ${BUS.map(b=>`<tr><td><b>${b}</b></td>${BU_FIELDS.map(([f])=>`<td>${inp(`bu.${b}.${f}`)}</td>`).join('')}<td class="num" id="inc_${b}" style="color:#B02A21">—</td><td class="num" id="bur_${b}">—</td></tr>`).join('')}
     <tr><td class="muted">Total</td>${BU_FIELDS.map(([f])=>`<td class="num" id="tot_${f}">0</td>`).join('')}<td class="num" id="inc_T" style="color:#B02A21">0</td><td class="num" id="bur_T">—</td></tr></tbody></table></div>
-    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Target = stores / deployments assigned (current status from the Deployment KPI Tool). <b>Incomplete</b> is computed (Target − Complete − Incomplete Full Dep.). <b>Incomplete – Full Deployment</b> = deployed everything that was available; the rest had no POSM stock, so it counts as complete.</p>
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">Target = displayed models answered in the POSM Execution check (latest answer per store in this grade period; CTN/EOL and No display not counted). <b>Incomplete</b> is computed (Target − Complete − No POSM Stock). <b>No POSM Stock</b> (Inc. Full Dep.) = POSM has no available stock, so it counts as complete.</p>
     <div style="margin-top:10px"><div class="muted" style="font-size:12px;margin-bottom:6px"><b style="color:var(--text)">Audit verification</b> — from POSM Audit / leader store visits. If blank, deployment is taken as reported.</div>${flat(FLAT.audit)}</div>
     <div class="res" id="res_dep"></div><div class="err" id="err_dep"></div></div>
   <div class="sect"><div class="hd"><b>2. ${KPIS[1].name}</b><span>${S.weights.rep}%</span></div><p>${KPIS[1].desc}<br><i>Formula: ${KPIS[1].formula}</i></p>
@@ -863,14 +863,14 @@ function renderCard(){
       ${(r.deductions||[]).map(d=>`<tr><td style="color:#B02A21;white-space:normal">Deduction: ${esc(d.label)}</td><td></td><td></td><td class="num" style="color:#B02A21">−${d.pts}</td></tr>`).join('')}
       <tr><td><b>Final POSM KPI</b></td><td></td><td></td><td class="num"><b>${c.final.toFixed(2)}%</b></td></tr></tbody></table></div>
       ${r.remarks?`<p style="margin-top:12px"><span class="muted">RMAS remarks:</span> ${esc(r.remarks)}</p>`:''}
-      ${(r.depStores||[]).length?`<details style="margin-top:12px"${(r.depStores||[]).length<=8?' open':''}><summary style="cursor:pointer;font-size:12.5px"><b>Stores not yet Complete (${r.depStores.length})</b> <span class="muted">— from Deployment KPI Tool</span></summary>
+      ${(r.depStores||[]).length?`<details style="margin-top:12px"${(r.depStores||[]).length<=8?' open':''}><summary style="cursor:pointer;font-size:12.5px"><b>Stores not yet Complete (${r.depStores.length})</b> <span class="muted">— from POSM Execution check</span></summary>
         <div class="tbl-wrap"><table style="margin-top:6px"><thead><tr><th>Store</th><th>BU</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${r.depStores.map(x=>`<tr><td>${esc(x.store)}</td><td>${x.bu}</td><td>${statusKind(x.status)==='fullDep'?`<span class="tag" style="color:#1E4FA6;border-color:#C3D3F2;background:#E7EEFB">${esc(x.status)}</span>`:`<span class="tag dis">${esc(x.status)}</span>`}</td><td class="muted" style="white-space:normal">${esc(x.remarks)}</td></tr>`).join('')}</tbody></table></div></details>`:''}
       ${c.flags.map(f=>`<div class="flag ${f[0]}">${f[1]}</div>`).join('')}</div>
     <div class="card"><h3>Deployment status per BU</h3><div class="tbl-wrap"><table><thead><tr><th>BU</th>${['required','complete','fullDep'].map(f=>`<th class="num">${BU_SHORT[f]}</th>`).join('')}<th class="num">Incomplete</th><th class="num">Rate</th></tr></thead><tbody>
       ${BUS.map(b=>{const x=(r.bu||{})[b]||{};const V=f=>`<td class="num">${has(x[f])?x[f]:'—'}</td>`;return `<tr><td><b>${b}</b></td>${['required','complete','fullDep'].map(V).join('')}<td class="num" style="color:#B02A21">${has(x.required)?Math.max(0,n(x.required)-buDone(x)):'—'}</td><td class="num"><b>${pct(buRate(r,b))}</b></td></tr>`}).join('')}
       <tr><td class="muted">Total</td>${['required','complete','fullDep'].map(f=>`<td class="num">${c.a[f]}</td>`).join('')}<td class="num" style="color:#B02A21">${c.a.incomplete}</td><td class="num"><b>${c.a.required?pct(Math.min(c.a.deployed,c.a.required)/c.a.required):'—'}</b></td></tr></tbody></table></div>
       ${n(r.auditStores)>0?`<p class="muted" style="font-size:12px">Audit: ${n(r.auditVerified)} of ${n(r.auditStores)} stores verified (${pct(verRate(r))}).</p>`:''}
-      <h3 style="margin-top:14px">Deployment funnel</h3><div class="funnel">${(()=>{const st=[['Target',c.a.required],['Complete',c.a.complete],['+ Inc. Full Dep.',c.a.deployed],...(has(r.reported)?[['Reported w/ proof',n(r.reported)]]:[])];
+      <h3 style="margin-top:14px">Deployment funnel</h3><div class="funnel">${(()=>{const st=[['Target',c.a.required],['Complete',c.a.complete],['+ No POSM Stock',c.a.deployed],...(has(r.reported)?[['Reported w/ proof',n(r.reported)]]:[])];
         const rq=reqScore(r,c.a);const extra=!(r.locked&&rq!=null)?'':`<div class="kpibar" style="margin-top:12px"><div class="n">Request deployment <small>${c.a.delivered} delivered · ${r.reqVerify==='verified'?'verified':r.reqVerify==='partial'?n(r.reqDeployed)+' deployed':'pending RMAS'}</small></div><div class="bar"><i style="width:${rq==null?0:rq*100}%"></i></div><div class="p">${rq==null?'—':pct(rq)}</div></div>`;const mx=Math.max(1,...st.map(s=>s[1]));
         return st.map(([l,v],i)=>`<div class="step"><div>${l}</div><div><div class="fb" style="width:${v/mx*100}%">${v}</div></div><div class="muted" style="text-align:right">${i?(st[0][1]?(v/st[0][1]*100).toFixed(1)+'%':'—'):'100%'}</div></div>`).join('')+'</div>'+extra})()}</div>
   </div>
@@ -917,7 +917,7 @@ auditStores:['AUDITEDSTORES','STORESAUDITED','AUDITED'],auditVerified:['AUDITVER
 const COL_LABEL={month:'DATE',ts:'TRADE SUPERVISOR',bu:'BU',region:'REGION',status:'STATUS',required:'TARGET',complete:'COMPLETE',fullDep:'INCOMPLETE FULL DEPLOYMENT',auditStores:'AUDITED STORES',auditVerified:'AUDIT VERIFIED',
   repDue:'REPORTS DUE',repOnTime:'REPORTS ON TIME',repAccurate:'REPORTS ACCURATE',reported:'REPORTED WITH PROOF',comSent:'INSTRUCTIONS SENT',comResp:'RESPONDED WITHIN SLA',meetReq:'MEETINGS REQUIRED',meetAtt:'MEETINGS ATTENDED'};
 const BU_KEYS=BU_FIELDS.map(f=>f[0]);
-function statusKind(v){const h=normH(v);if(!h)return null;if(h.includes('FULL'))return 'fullDep';if(h.startsWith('INCOMPLETE')||h.startsWith('NOT')||h.startsWith('PENDING'))return 'incomplete';if(h.startsWith('COMPLETE')||h==='DONE'||h==='DEPLOYED')return 'complete';return 'incomplete'}
+function statusKind(v){const h=normH(v);if(!h)return null;if(h.includes('FULL')||h.includes('NOPOSMSTOCK')||h.includes('NOSTOCK'))return 'fullDep';if(h.startsWith('INCOMPLETE')||h.startsWith('NOT')||h.startsWith('PENDING'))return 'incomplete';if(h.startsWith('COMPLETE')||h==='DONE'||h==='DEPLOYED')return 'complete';return 'incomplete'}
 function normH(h){return String(h).toUpperCase().replace(/[^A-Z0-9]/g,'')}
 // Is a CSV date value inside the date range? true / false / null (unreadable).
 // Full dates are checked day by day; a month-only value ("2026-09", "Sep 2026") counts when that month overlaps the range.
@@ -935,17 +935,17 @@ function renderImp(){
     <div class="row" style="margin-bottom:10px"><button class="btn pri" id="pullAll">Pull ALL tools now</button><span class="muted" style="font-size:12px">Then check the <b>Data check</b> box below to see what was read and what was skipped.</span></div>
     <p class="muted" style="font-size:12.5px;margin-top:0">The KPI tool reads data directly from your other RMAS tools' Google Sheets — no export, no upload. Pulled values fill the grade automatically (blue fields) and never overwrite numbers RMAS typed manually.</p>
     <div class="tbl-wrap"><table><thead><tr><th>Tool</th><th>Status</th><th>Fills in the KPI</th></tr></thead><tbody>
-      <tr><td><b>Deployment KPI Tool</b></td><td>${src.deploymentUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal" class="muted">Target, Complete, Incomplete, Incomplete Full Deployment per TS per BU</td></tr>
+      <tr><td><b>POSM Execution dashboard</b></td><td>${src.deploymentUrl?'<span class="tag ack">Connected</span>':'<span class="tag pen">Not connected</span>'}</td><td style="white-space:normal" class="muted">Per displayed model per store: Complete, No POSM Stock (counted complete), Incomplete — per TS per BU, current grade period only</td></tr>
       <tr><td><b>POSM Audit</b></td><td><span class="tag">Coming soon</span></td><td style="white-space:normal" class="muted">Stores audited, stores with verified display, reported with photo proof</td></tr>
     </tbody></table></div>
     <div style="margin-top:14px">
-    <label class="muted" style="font-size:12px;display:block">Deployment KPI Tool (POSM KPI Command Center) — Apps Script Web App URL</label>
+    <label class="muted" style="font-size:12px;display:block">POSM Execution dashboard (IN-STORE-POSM-CHECKING) — Apps Script Web App URL</label>
     <div class="row" style="margin-top:4px"><input id="depUrl" value="${esc(src.deploymentUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;min-width:220px"><button class="btn sm pri" id="depSave">Save &amp; test</button></div>
     <div class="row" style="margin-top:10px">
-      <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull deployment status now</button>
+      <button class="btn" id="depPull" ${src.deploymentUrl?'':'disabled'}>Pull from POSM Execution now</button>
       <label class="row" style="gap:6px;font-size:12.5px"><input type="checkbox" id="depAuto" ${src.depAutoPull?'checked':''}> Auto-pull when the tool opens and every 10 min (Admin)</label></div>
     <div id="depRes" style="margin-top:10px">${src.depLastPull?`<div class="flag blue" style="margin-top:0">Last pull: ${new Date(src.depLastPull.at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'})} · ${esc(src.depLastPull.summary)}</div>`:''}</div>
-    <p class="muted" style="font-size:11.5px;margin-bottom:0">Each pull takes the <b>current</b> status per store, so the KPI always follows what is in the Deployment KPI Tool right now. Renamed TS (RENAME_TS in MasterChanges) are applied automatically.</p></div>
+    <p class="muted" style="font-size:11.5px;margin-bottom:0">Each pull reads the execution reports sent within the open grade period and takes the <b>latest</b> answer per store per BU, so the deployment grade follows the POSM Execution dashboard. A TS with no execution report in the period has no deployment score yet.</p></div>
   </div>
   <div class="card" style="margin-bottom:14px" id="diagCard"></div>
   <div class="grid two">
@@ -983,11 +983,11 @@ function renderImp(){
   $('gPull').onclick=()=>pullRemote(true);$('gPush').onclick=()=>pushRemote(true);
   $('gOff').onclick=()=>{sheetUrl='';lsSet(URL_KEY,'');setSync('','Offline');renderImp();toast('Disconnected — offline mode')};
   $('gCode').onclick=()=>download('Code.gs',CODE_GS,'text/plain');
-  $('depSave').onclick=async()=>{S.sources.deploymentUrl=$('depUrl').value.trim();save();if(!S.sources.deploymentUrl){renderImp();return toast('Deployment KPI Tool disconnected')}
+  $('depSave').onclick=async()=>{S.sources.deploymentUrl=$('depUrl').value.trim();save();if(!S.sources.deploymentUrl){renderImp();return toast('POSM Execution disconnected')}
     $('depRes').innerHTML='<div class="flag blue" style="margin-top:0">Testing connection…</div>';
     try{const d=await fetchDeployments();const ts=new Set(d.records.map(r=>r.ts.trim().toLowerCase()));renderImp();
-      $('depRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.records.length} store-BU deployment rows, ${ts.size} TS found.</div>`}
-    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the Deployment KPI Tool: ${esc(e.message)}. Check that the URL ends in /exec and the Deployment Tracker has the latest Code.gs.</div>`}};
+      $('depRes').innerHTML=`<div class="flag green" style="margin-top:0">Connected — ${d.stores} stores visited in this grade period, ${d.records.length} scored models, ${ts.size} TS found.</div>`}
+    catch(e){$('depRes').innerHTML=`<div class="flag red" style="margin-top:0">Could not read the POSM Execution dashboard: ${esc(e.message)}. Check that the URL ends in /exec (same URL as DATA_URL in dashboard.html).</div>`}};
   $('depPull').onclick=()=>pullDeployments(LIVE,true);
   $('pullAll').onclick=async()=>{await pullAllSources(LIVE,true);renderDiag()};renderDiag();
   $('depAuto').onchange=e=>{S.sources.depAutoPull=e.target.checked;save();toast(e.target.checked?'Auto-pull on':'Auto-pull off')};
@@ -1022,32 +1022,55 @@ function applyImport(){if(!pending)return;const res=applyGroups(pending.list,pen
 const DIAG={},TSC={};
 const tally=(o,k)=>{k=String(k===undefined||k===null||k===''?'(blank)':k);o[k]=(o[k]||0)+1};
 function newDiag(src,m){return DIAG[src]={src,month:m,at:new Date(),read:0,used:0,skip:{},badBU:{},status:{},months:{},note:''}}
-/* ---------- Deployment KPI Tool connector (POSM KPI Command Center) ---------- */
-async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw new Error('No Deployment Tracker URL');
-  const r=await fetch(u+(u.includes('?')?'&':'?')+'action=getAll&t='+Date.now());const d=await r.json();if(!d||d.ok===false||!Array.isArray(d.records))throw new Error(d&&d.error?d.error:'Unexpected response');
-  d.masterChanges=d.masterChanges||[];return d}
+/* ---------- POSM Execution connector (IN-STORE-POSM-CHECKING dashboard) ----------
+   Reads the TS execution-check reports. For the open grade period only, each store keeps the
+   LATEST answer per BU (same rule as the Execution dashboard). Every displayed model is one
+   deployment target:  Complete → Complete · No POSM Stock → counted as complete (Full Dep.)
+   Incomplete → not credited · CTN/EOL and "No display" → not scored. */
+const EXEC_ST={C:'Complete',N:'No POSM Stock',I:'Incomplete'};
+const manilaYmd=at=>{const t=Date.parse(at);return isNaN(t)?'':new Date(t+8*3600e3).toISOString().slice(0,10)};
+function execWindow(){const ym=workCycle();return {ym,from:cycleStart(ym),to:cycleEnd(ym)}}
+async function fetchDeployments(){const u=S.sources.deploymentUrl;if(!u)throw new Error('No POSM Execution URL');
+  const r=await fetch(u+(u.includes('?')?'&':'?')+'t='+Date.now());const d=await r.json();if(!d||d.ok===false||!Array.isArray(d.reports))throw new Error(d&&d.error?d.error:'Unexpected response from the Execution dashboard');
+  const W=execWindow();const inWin=d.reports.filter(x=>{const y=manilaYmd(x.at);return y&&y>=W.from&&y<=W.to});
+  const byStore={};
+  [...inWin].sort((a,b)=>String(a.at).localeCompare(String(b.at))).forEach(x=>{const k=String(x.store||'').trim().toUpperCase();if(!k)return;
+    const cur=byStore[k]=byStore[k]||{m:{}};cur.ts=x.ts||cur.ts;cur.region=x.region||cur.region;cur.store=x.store;cur.at=x.at;
+    const items=Array.isArray(x.items)?x.items:[];const rb=new Set(items.map(i=>i.bu));
+    Object.keys(cur.m).forEach(mk=>{if(rb.has(mk.split('|')[0]))delete cur.m[mk]});
+    items.forEach(i=>{cur.m[i.bu+'|'+(i.code||i.desc||'')]=i})});
+  const records=[];
+  Object.values(byStore).forEach(st=>Object.values(st.m).forEach(i=>{const s=String(i.status||'').toUpperCase();
+    if(s==='O'||s==='ND'||!EXEC_ST[s])return; // CTN/EOL and No display are not scored
+    records.push({ts:String(st.ts||''),region:String(st.region||''),store:String(st.store||''),bu:i.bu,status:EXEC_ST[s],
+      model:String(i.code||''),remarks:[i.code,i.remarks].filter(Boolean).join(' — '),at:st.at})}));
+  return {records,masterChanges:[],window:W,reports:d.reports.length,inWindow:inWin.length,stores:Object.keys(byStore).length}}
 let depUnknown=[];
 async function pullDeployments(m,manual,confirmed){
   if(!S.sources.deploymentUrl)return;
-  const box=$('depRes');if(box)box.innerHTML='<div class="flag blue" style="margin-top:0">Pulling deployment status…</div>';
+  const box=$('depRes');if(box)box.innerHTML='<div class="flag blue" style="margin-top:0">Pulling deployment from the POSM Execution dashboard…</div>';
   try{const d=await fetchDeployments();
     // apply TS renames from MasterChanges (oldest first)
     let ren=0;d.masterChanges.filter(c=>c.action==='RENAME_TS'&&c.oldTS&&c.ts).sort((a,b)=>String(a.timestamp).localeCompare(String(b.timestamp))).forEach(c=>{
       const o=findTs(c.oldTS);if(o&&!findTs(c.ts)){o.aliases=[...new Set([...(o.aliases||[]),o.name])];o.name=c.ts.trim();ren++}});
     TSC.dep={active:new Set(d.records.map(r=>nameKey(r.ts)).filter(Boolean)).size};
     const groups={};let noBU=0;const counts={complete:0,fullDep:0,incomplete:0};const D=newDiag('dep',m);D.read=d.records.length;
-    D.note='Status → Complete: '+Object.keys(d.records.reduce((a,r)=>(statusKind(r.status)==='complete'&&(a[r.status]=1),a),{})).join(', ')+' · Incomplete Full Dep.: '+Object.keys(d.records.reduce((a,r)=>(statusKind(r.status)==='fullDep'&&(a[r.status]=1),a),{})).join(', ');
+    D.note=`Grade period ${d.window.from} to ${d.window.to}: ${d.inWindow} of ${d.reports} execution reports, ${d.stores} stores visited, ${d.records.length} scored models (latest answer per store per BU). Complete = Complete · No POSM Stock = counted as complete · CTN/EOL and No display not scored.`;
     d.records.forEach(rec=>{tally(D.status,rec.status);const name=rec.ts.trim();if(!name){tally(D.skip,'no Trade Supervisor');return}const bu=normBU(rec.bu);if(!bu){noBU++;tally(D.skip,'BU not recognized');tally(D.badBU,rec.bu);return}D.used++;const k=statusKind(rec.status)||'incomplete';counts[k]++;
       const g=groups[nameKey(name)]=groups[nameKey(name)]||{m,name,region:rec.region.trim(),vals:{},stores:[],seen:new Set()};g.seen.add(bu);
       const P=f=>`bu.${bu}.${f}`;['required','complete','fullDep'].forEach(f=>{if(g.vals[P(f)]==null)g.vals[P(f)]=0});g.vals[P('required')]++;if(k!=='incomplete')g.vals[P(k)]++;
-      if(k!=='complete')g.stores.push({store:rec.store,bu,status:rec.status,remarks:rec.remarks||''})});
-    Object.values(groups).forEach(g=>BUS.forEach(b=>{if(!g.seen.has(b))['required','complete','fullDep'].forEach(f=>g.vals[`bu.${b}.${f}`]=null)}));
+      if(k!=='complete'){const sk=rec.store+'|'+bu+'|'+rec.status;const ex=g.stores.find(z=>z._k===sk);
+        if(ex){ex.n++;if(rec.remarks)ex.r.push(rec.remarks)}else g.stores.push({_k:sk,store:rec.store,bu,status:rec.status,n:1,r:rec.remarks?[rec.remarks]:[]})}});
+    Object.values(groups).forEach(g=>{g.stores=g.stores.map(z=>({store:z.store,bu:z.bu,status:z.status+(z.n>1?` (${z.n} models)`:' (1 model)'),remarks:z.r.join(' · ')}));
+      BUS.forEach(b=>{if(!g.seen.has(b))['required','complete','fullDep'].forEach(f=>g.vals[`bu.${b}.${f}`]=null)})});
+    // TS with no execution report in this grade period: clear deployment values pulled before (no visit = no deployment data)
+    S.ts.filter(t=>!t.inactive&&!groups[nameKey(t.name)]).forEach(t=>{const v={};BUS.forEach(b=>['required','complete','fullDep'].forEach(f=>v[`bu.${b}.${f}`]=null));groups[nameKey(t.name)]={m,name:t.name,region:t.region,vals:v,stores:[],seen:new Set()}});
     const list=Object.values(groups);
-    const res=applyGroups(list,'Deployment KPI Tool',{respectManual:true,addNew:false,extra:(r,x)=>{const a=JSON.stringify(r.depStores||[]),b=JSON.stringify(x.stores);r.depStores=x.stores;return a!==b}});
+    const res=applyGroups(list,'POSM Execution',{respectManual:true,addNew:false,alsoClear:['Deployment KPI Tool'],extra:(r,x)=>{const a=JSON.stringify(r.depStores||[]),b=JSON.stringify(x.stores);r.depStores=x.stores;return a!==b}});
     depUnknown=list.filter(x=>res.skipped.includes(x.name)).map(x=>({name:x.name,region:x.region}));
-    const summary=`${d.records.length} store rows (${counts.complete} Complete, ${counts.fullDep} Inc. Full Dep., ${counts.incomplete} Incomplete) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${ren?`, ${ren} TS renamed`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in the official TS list`:''}${noBU?`, ${noBU} row(s) with unknown BU`:''}`;
+    const summary=`${d.stores} stores visited ${d.window.from} to ${d.window.to} · ${d.records.length} scored models (${counts.complete} Complete, ${counts.fullDep} No POSM Stock, ${counts.incomplete} Incomplete) → ${res.upd} TS updated${res.added?`, ${res.added} new TS added`:''}${ren?`, ${ren} TS renamed`:''}${res.kept?`, ${res.kept} manual value(s) kept`:''}${res.skip?`, ${res.skip} TS not in the official TS list`:''}${noBU?`, ${noBU} row(s) with unknown BU`:''}`;
     S.sources.depLastPull={month:m,at:new Date().toISOString(),summary};save();fillRegions();
-    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU?'':'green'}" style="margin-top:0">Deployment KPI Tool: ${summary}.
+    if(box)box.innerHTML=`<div class="flag ${res.skip||noBU?'':'green'}" style="margin-top:0">POSM Execution: ${summary}.
       ${depUnknown.length?`<br>Not in the official TS list (check spelling — use Merge in Settings, or add them): ${depUnknown.slice(0,8).map(x=>esc(x.name)).join(', ')}${depUnknown.length>8?'…':''} <button class="btn sm" id="depAddTs" style="margin-left:6px">Add these ${depUnknown.length} TS &amp; pull again</button>`:''}</div>`;
     if($('depAddTs'))$('depAddTs').onclick=()=>{depUnknown.forEach(x=>{ensureTs(x.name,x.region)});save();fillRegions();pullDeployments(m,true,true)};
     if(manual)toast('Deployment status pulled');renderDiag();if(!BG&&view!=='imp')render();return res}
@@ -1055,7 +1078,7 @@ async function pullDeployments(m,manual,confirmed){
 async function pullAllSources(m,manual){const src=S.sources;
   if(src.deploymentUrl)await pullDeployments(m,manual);
   if(manual)toast('Latest data pulled from all connected tools')}
-function renderDiag(){const box=$('diagCard');if(!box)return;const names={dep:'Deployment KPI Tool',inv:'Inventory Tool'};
+function renderDiag(){const box=$('diagCard');if(!box)return;const names={dep:'POSM Execution dashboard',inv:'Inventory Tool'};
   const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]);
   const list=o=>top(o).map(([k,v])=>`<span class="tag" style="margin:2px">${esc(k)}: ${v}</span>`).join('')||'<span class="muted">—</span>';
   const bad=new Set();Object.values(DIAG).forEach(D=>Object.keys(D.badBU).forEach(k=>{if(!k.startsWith('(POSM code'))bad.add(k)}));
@@ -1067,7 +1090,7 @@ function renderDiag(){const box=$('diagCard');if(!box)return;const names={dep:'D
     <div style="font-size:12px;margin:4px 0"><span class="muted">Status values found:</span> ${list(D.status)}</div>
     ${Object.keys(D.months).length?`<div style="font-size:12px;margin:4px 0"><span class="muted">Delivered months:</span> ${list(D.months)}</div>`:''}</div>`}).join('');
   const tsBlock=Object.keys(TSC).length?`<div class="sect" style="margin:10px 0 0"><div class="hd"><b>Trade Supervisors per tool</b><span>KPI tool list: ${S.ts.length} TS</span></div>
-    <div style="font-size:12.5px">${TSC.inv?`Inventory Tool: <b>${TSC.inv.active}</b> active${TSC.inv.inactive.length?` (+${TSC.inv.inactive.length} deleted/inactive: ${TSC.inv.inactive.slice(0,6).map(esc).join(', ')}${TSC.inv.inactive.length>6?'…':''})`:''} · `:''}${TSC.dep?`Deployment KPI Tool: <b>${TSC.dep.active}</b>`:''}</div>
+    <div style="font-size:12.5px">${TSC.inv?`Inventory Tool: <b>${TSC.inv.active}</b> active${TSC.inv.inactive.length?` (+${TSC.inv.inactive.length} deleted/inactive: ${TSC.inv.inactive.slice(0,6).map(esc).join(', ')}${TSC.inv.inactive.length>6?'…':''})`:''} · `:''}${TSC.dep?`POSM Execution: <b>${TSC.dep.active}</b>`:''}</div>
     <p class="muted" style="font-size:11.5px;margin:6px 0 0">The KPI list = everyone found in any of the tools (same person with different spelling is matched automatically). If a TS is missing here, he/she is not in any tool yet — add in Settings.</p></div>`:'';
   box.innerHTML=`<h3>Data check — what was pulled and what was skipped</h3>${tsBlock}${blocks||'<p class="muted" style="margin:0">Click <b>Pull ALL tools</b> above to see a breakdown per tool.</p>'}
     ${bad.size?`<div class="sect" style="margin-top:12px;border-color:var(--warn)"><div class="hd"><b>Map unrecognized BU names</b><span style="color:var(--warn)">rows with these BUs are skipped</span></div>
@@ -1083,7 +1106,7 @@ function applyGroups(list,srcName,opt={}){let upd=0,added=0,skip=0,reack=0,kept=
     if(!t){if(!opt.addNew){skip++;skipped.push(x.name);return}t=ensureTs(x.name,x.region).t;added++}
     const k=x.m+'|'+t.id;const r=S.records[k]?JSON.parse(JSON.stringify(S.records[k])):{bu:{},deductions:[],src:{},remarks:''};r.src=r.src||{};const before=sig(r);let changed=false;
     Object.entries(x.vals).forEach(([p,v])=>{const cur=getP(r,p);
-      if(v===null){if(has(cur)&&r.src[p]&&r.src[p].startsWith(srcName)){setP(r,p,undefined);delete r.src[p];changed=true}return}
+      if(v===null){if(has(cur)&&r.src[p]&&[srcName,...(opt.alsoClear||[])].some(n=>r.src[p].startsWith(n))){setP(r,p,undefined);delete r.src[p];changed=true}return}
       if(opt.respectManual&&has(cur)&&!r.src[p]){kept++;return}if(cur!==v||!r.src[p])changed=true;setP(r,p,v);r.src[p]=stamp});
     if(opt.extra&&opt.extra(r,x))changed=true;
     if(!changed)return;if(r.ack&&sig(r)!==before){delete r.ack;reack++}r.updated=new Date().toISOString();S.records[k]=r;upd++});
@@ -1587,7 +1610,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('slideDlg').open)
    BOOT
    ===================================================================== */
 applyRole();
-// Continuous refresh: Admin devices pull the latest from the Deployment KPI Tool on open and every 10 minutes.
+// Continuous refresh: Admin devices pull the latest from the POSM Execution dashboard on open and every 10 minutes.
 // Background pulls never re-render the Encode / Settings / Import pages, so typing is not interrupted.
 let BG=false,refreshing=false;
 async function autoRefresh(){autoLock();if(!isAdmin()||refreshing||document.visibilityState!=='visible')return;const src=S.sources;refreshing=true;BG=true;
